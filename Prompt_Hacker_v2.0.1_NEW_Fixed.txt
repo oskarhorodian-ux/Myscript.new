@@ -2347,7 +2347,17 @@ end)
 
 createToggle(visualsPage, "📦 Увеличить хитбоксы врагов (С подсветкой)", function(Value)
     hitboxEnabled = Value
-    if not hitboxEnabled then return end
+    
+    -- Очистка при выключении
+    if not hitboxEnabled then
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr.Character then
+                local hb = plr.Character:FindFirstChild("PromptHitbox")
+                if hb then hb:Destroy() end
+            end
+        end
+        return 
+    end
 
     task.spawn(function()
         while hitboxEnabled and not _G.ScriptDestroyed do
@@ -2357,42 +2367,40 @@ createToggle(visualsPage, "📦 Увеличить хитбоксы врагов
                         local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
                         local hum = plr.Character:FindFirstChildOfClass("Humanoid")
                         if hrp and hum and hum.Health > 0 then
-                            hrp.Size = Vector3.new(hitboxSizeValue, hitboxSizeValue, hitboxSizeValue)
-                            hrp.Transparency = 0.65
-                            hrp.Color = Color3.fromRGB(255, 45, 45)
-                            hrp.Material = Enum.Material.Neon
-                            hrp.CanCollide = false
-                            hrp.Massless = true
-
-                            local sel = hrp:FindFirstChild("PromptBigHitboxVis")
-                            if not sel then
-                                sel = Instance.new("SelectionBox")
+                            local hb = plr.Character:FindFirstChild("PromptHitbox")
+                            if not hb then
+                                hb = Instance.new("Part")
+                                hb.Name = "PromptHitbox"
+                                hb.Transparency = 0.65
+                                hb.Color = Color3.fromRGB(255, 45, 45)
+                                hb.Material = Enum.Material.Neon
+                                hb.CanCollide = false
+                                hb.CanQuery = true
+                                hb.CanTouch = true
+                                hb.Massless = true
+                                hb.Parent = plr.Character
+                                
+                                local weld = Instance.new("WeldConstraint")
+                                weld.Part0 = hb
+                                weld.Part1 = hrp
+                                weld.Parent = hb
+                                
+                                local sel = Instance.new("SelectionBox")
                                 sel.Name = "PromptBigHitboxVis"
-                                sel.Adornee = hrp
+                                sel.Adornee = hb
                                 sel.Color3 = Color3.fromRGB(255, 60, 60)
                                 sel.SurfaceColor3 = Color3.fromRGB(255, 60, 60)
                                 sel.SurfaceTransparency = 0.8
                                 sel.LineThickness = 0.05
-                                sel.Parent = hrp
+                                sel.Parent = hb
                             end
+                            hb.Size = Vector3.new(hitboxSizeValue, hitboxSizeValue, hitboxSizeValue)
+                            hb.Position = hrp.Position
                         end
                     end
                 end
             end
             RunService.Heartbeat:Wait()
-        end
-
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if plr ~= Player and plr.Character then
-                local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
-                if hrp then
-                    hrp.Size = Vector3.new(2, 2, 1)
-                    hrp.Transparency = 1
-                    hrp.Massless = false
-                    local sel = hrp:FindFirstChild("PromptBigHitboxVis")
-                    if sel then sel:Destroy() end
-                end
-            end
         end
     end)
 end)
