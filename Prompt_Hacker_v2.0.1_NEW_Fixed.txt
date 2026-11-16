@@ -1793,6 +1793,172 @@ createToggle(visualsPage, "🎥 Свободная камера (Freecam)", func
         end
     end
 end)
+-- 🏗️ РЕЖИМ СТРОЙКИ (BUILDER MODE)
+local builderModeEnabled = false
+local builderGui = nil
+local topNotif = nil
+local selectedType = nil
+local blockSizeValue = 5
+
+createToggle(movePage, "🏗️ Режим Стройки (Builder)", function(Value)
+    builderModeEnabled = Value
+    
+    if builderModeEnabled then
+        -- Верхнее уведомление
+        if not topNotif then
+            topNotif = Instance.new("TextLabel")
+            topNotif.Size = UDim2.new(0, 250, 0, 40)
+            topNotif.Position = UDim2.new(0.5, -125, 0.05, 0)
+            topNotif.BackgroundColor3 = Color3.fromRGB(25, 30, 35)
+            topNotif.Text = "🏗️ РЕЖИМ СТРОЙКИ 👷"
+            topNotif.TextColor3 = Color3.fromRGB(255, 220, 60)
+            topNotif.Font = Enum.Font.SourceSansBold
+            topNotif.TextSize = 16
+            topNotif.Parent = ScreenGui
+            topNotif.ZIndex = 80
+            Instance.new("UICorner", topNotif).CornerRadius = UDim.new(0, 8)
+        end
+        topNotif.Visible = true
+        
+        -- Боковая панель
+        if not builderGui then
+            builderGui = Instance.new("Frame")
+            builderGui.Size = UDim2.new(0, 150, 0, 220)
+            builderGui.Position = UDim2.new(0, 10, 0.5, -110)
+            builderGui.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+            builderGui.Parent = ScreenGui
+            builderGui.ZIndex = 75
+            Instance.new("UICorner", builderGui).CornerRadius = UDim.new(0, 10)
+            
+            local stroke = Instance.new("UIStroke", builderGui)
+            stroke.Color = Color3.fromRGB(255, 220, 60)
+            stroke.Thickness = 2
+            
+            local title = Instance.new("TextLabel", builderGui)
+            title.Size = UDim2.new(1, 0, 0, 30)
+            title.BackgroundTransparency = 1
+            title.Text = "🛠️ Инструменты"
+            title.TextColor3 = Color3.fromRGB(255, 255, 255)
+            title.Font = Enum.Font.SourceSansBold
+            title.TextSize = 14
+            title.ZIndex = 76
+            
+            local sizeBox = Instance.new("TextBox", builderGui)
+            sizeBox.Size = UDim2.new(1, -20, 0, 30)
+            sizeBox.Position = UDim2.new(0, 10, 0, 35)
+            sizeBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            sizeBox.Text = "Размер: 5"
+            sizeBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+            sizeBox.ZIndex = 76
+            Instance.new("UICorner", sizeBox).CornerRadius = UDim.new(0, 5)
+            
+            sizeBox.FocusLost:Connect(function()
+                local num = tonumber(sizeBox.Text:match("%d+"))
+                if num then blockSizeValue = num end
+                sizeBox.Text = "Размер: " .. blockSizeValue
+            end)
+            
+            local wallBtn = Instance.new("TextButton", builderGui)
+            wallBtn.Size = UDim2.new(1, -20, 0, 35)
+            wallBtn.Position = UDim2.new(0, 10, 0, 75)
+            wallBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            wallBtn.Text = "Стенка"
+            wallBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            wallBtn.Font = Enum.Font.SourceSansBold
+            wallBtn.ZIndex = 76
+            Instance.new("UICorner", wallBtn).CornerRadius = UDim.new(0, 5)
+            
+            local floorBtn = Instance.new("TextButton", builderGui)
+            floorBtn.Size = UDim2.new(1, -20, 0, 35)
+            floorBtn.Position = UDim2.new(0, 10, 0, 115)
+            floorBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            floorBtn.Text = "Пол"
+            floorBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            floorBtn.Font = Enum.Font.SourceSansBold
+            floorBtn.ZIndex = 76
+            Instance.new("UICorner", floorBtn).CornerRadius = UDim.new(0, 5)
+            
+            local confirmBtn = Instance.new("TextButton", builderGui)
+            confirmBtn.Size = UDim2.new(0, 50, 0, 35)
+            confirmBtn.Position = UDim2.new(0, 10, 1, -45)
+            confirmBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+            confirmBtn.Text = "✓"
+            confirmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            confirmBtn.Font = Enum.Font.SourceSansBold
+            confirmBtn.TextSize = 20
+            confirmBtn.Visible = false
+            confirmBtn.ZIndex = 76
+            Instance.new("UICorner", confirmBtn).CornerRadius = UDim.new(0, 5)
+            
+            local cancelBtn = Instance.new("TextButton", builderGui)
+            cancelBtn.Size = UDim2.new(0, 50, 0, 35)
+            cancelBtn.Position = UDim2.new(1, -60, 1, -45)
+            cancelBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+            cancelBtn.Text = "✗"
+            cancelBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            cancelBtn.Font = Enum.Font.SourceSansBold
+            cancelBtn.TextSize = 20
+            cancelBtn.Visible = false
+            cancelBtn.ZIndex = 76
+            Instance.new("UICorner", cancelBtn).CornerRadius = UDim.new(0, 5)
+            
+            -- Логика выбора
+            local function selectType(t)
+                selectedType = t
+                wallBtn.BackgroundColor3 = (t == "wall") and Color3.fromRGB(50, 180, 50) or Color3.fromRGB(50, 50, 50)
+                floorBtn.BackgroundColor3 = (t == "floor") and Color3.fromRGB(50, 180, 50) or Color3.fromRGB(50, 50, 50)
+                confirmBtn.Visible = true
+                cancelBtn.Visible = true
+            end
+            
+            wallBtn.MouseButton1Click:Connect(function() selectType("wall") end)
+            floorBtn.MouseButton1Click:Connect(function() selectType("floor") end)
+            
+            -- Подтверждение постройки
+            confirmBtn.MouseButton1Click:Connect(function()
+                if not selectedType then return end
+                local char = Player.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if not hrp then return end
+                
+                local p = Instance.new("Part")
+                p.Anchored = true
+                p.CanCollide = true
+                p.Material = Enum.Material.SmoothPlastic
+                p.Color = Color3.fromRGB(150, 150, 150)
+                
+                if selectedType == "wall" then
+                    p.Size = Vector3.new(blockSizeValue, blockSizeValue * 2, 1)
+                else
+                    p.Size = Vector3.new(blockSizeValue, 1, blockSizeValue)
+                end
+                
+                -- Ставим блок в 10 стадах перед игроком
+                p.Position = hrp.Position + hrp.CFrame.LookVector * 10
+                p.Parent = workspace
+                
+                -- Сброс после постройки
+                selectedType = nil
+                wallBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+                floorBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+                confirmBtn.Visible = false
+                cancelBtn.Visible = false
+            end)
+            
+            cancelBtn.MouseButton1Click:Connect(function()
+                selectedType = nil
+                wallBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+                floorBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+                confirmBtn.Visible = false
+                cancelBtn.Visible = false
+            end)
+        end
+        builderGui.Visible = true
+    else
+        if builderGui then builderGui.Visible = false end
+        if topNotif then topNotif.Visible = false end
+    end
+end)
 
 -- 3. ПЛАТФОРМА ПОД НОГАМИ (ПОСТОЯННАЯ ХОДЬБА ПО ВОЗДУХУ + РАЗОВОЕ СОЗДАНИЕ)
 local underFeetWalkEnabled = false
