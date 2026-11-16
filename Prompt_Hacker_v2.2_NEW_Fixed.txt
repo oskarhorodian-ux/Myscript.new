@@ -103,7 +103,7 @@ Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 35)
 Title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-Title.Text = "  ⚡ PROMPT_HACKER MULTIHACK v1.8"
+Title.Text = "  ⚡ PROMPT_HACKER MULTIHACK v2.0"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 14
 Title.Font = Enum.Font.SourceSansBold
@@ -2232,7 +2232,7 @@ createToggle(visualsPage, "📦 Увеличить хитбоксы врагов
 end)
 
 -- вот тут находится конец 1 блока (части 7.2)
-createToggle(visualsPage, "🚀 Килл-Аура (Запуск врагов в стратосферу)", function(Value)
+createToggle(visualsPage, "🚀 Килл-Аура (Телепорт в Войд -20)", function(Value)
     killAuraEnabled = Value
     if not killAuraEnabled then return end
 
@@ -2251,9 +2251,16 @@ createToggle(visualsPage, "🚀 Килл-Аура (Запуск врагов в 
                                 if dist <= 35 then
                                     tHrp.Anchored = false
                                     tHrp.CanCollide = false
-                                    tHrp.CFrame = tHrp.CFrame + Vector3.new(0, 4, 0)
-                                    tHrp.AssemblyLinearVelocity = Vector3.new(math.random(-60, 60), 4500, math.random(-60, 60))
-                                    tHrp.AssemblyAngularVelocity = Vector3.new(40, 60, 40)
+                                    
+                                    -- Берем текущую высоту войда (-65) и отнимаем 20
+                                    local voidY = -65 
+                                    local targetY = voidY - 20 
+                                    
+                                    -- Телепорт на полученную координату (-85)
+                                    tHrp.CFrame = CFrame.new(tHrp.Position.X, targetY, tHrp.Position.Z)
+                                    
+                                    tHrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                                    tHrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
                                 end
                             end
                         end
