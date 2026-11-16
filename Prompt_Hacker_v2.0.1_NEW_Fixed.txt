@@ -2778,23 +2778,17 @@ local cdTrackerEnabled = false
 
 local activeHitboxVisuals = {}
 
-local function cleanupHitboxVisuals()
-    for i = #activeHitboxVisuals, 1, -1 do
-        local box = activeHitboxVisuals[i]
-        if not box or not box.Parent then
-            table.remove(activeHitboxVisuals, i)
-        end
-    end
-end
+local activeHitboxVisuals = {}
 
 local function isDynamicSkillHitbox(obj)
     if not obj:IsA("BasePart") then return false end
     if obj:FindFirstChild("PromptHitboxBox") then return false end
     if Player.Character and obj:IsDescendantOf(Player.Character) then return false end
+    if ghostVisualClone and obj:IsDescendantOf(ghostVisualClone) then return false end
     if obj.Name:find("Phantom_") or obj.Name:find("ZoneBoxVisual_") or obj.Name == "Baseplate" then return false end
 
     local maxAxis = math.max(obj.Size.X, obj.Size.Y, obj.Size.Z)
-    if maxAxis < 1.5 or maxAxis > 150 then return false end
+    if maxAxis < 1.5 or maxAxis > 250 then return false end
 
     local lowerName = obj.Name:lower()
     local parentName = obj.Parent and obj.Parent.Name:lower() or ""
@@ -2815,32 +2809,58 @@ end
 
 local function attachDynamicHitboxVisual(part)
     if not hiddenHitboxesEnabled or not isDynamicSkillHitbox(part) then return end
+    if part:FindFirstChild("PromptHitboxBox") then return end
 
-    cleanupHitboxVisuals()
-    if #activeHitboxVisuals >= 35 then
-        local oldest = table.remove(activeHitboxVisuals, 1)
-        if oldest and oldest.Parent then oldest:Destroy() end
-    end
+    local hl = Instance.new("Highlight")
+    hl.Name = "PromptHitboxBox"
+    hl.Adornee = part
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    hl.FillColor = Color3.fromRGB(255, 50, 220)
+    hl.FillTransparency = 0.5
+    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+    hl.OutlineTransparency = 0
+    hl.Parent = part
 
-    local sel = Instance.new("SelectionBox")
-    sel.Name = "PromptHitboxBox"
-    sel.Adornee = part
-    sel.Color3 = Color3.fromRGB(255, 50, 220)
-    sel.SurfaceColor3 = Color3.fromRGB(255, 50, 220)
-    sel.SurfaceTransparency = 0.78
-    sel.LineThickness = 0.06
-    sel.Parent = part
+    local bbg = Instance.new("BillboardGui")
+    bbg.Name = "PromptHitboxInfo"
+    bbg.Adornee = part
+    bbg.Size = UDim2.new(0, 150, 0, 36)
+    bbg.StudsOffset = Vector3.new(0, (part.Size.Y * 0.5) + 1.5, 0)
+    bbg.AlwaysOnTop = true
+    bbg.Parent = part
 
-    table.insert(activeHitboxVisuals, sel)
+    local lbl = Instance.new("TextLabel", bbg)
+    lbl.Size = UDim2.new(1, 0, 1, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = part.Name .. "\n[" .. math.floor(part.Size.X) .. "x" .. math.floor(part.Size.Y) .. "x" .. math.floor(part.Size.Z) .. "]"
+    lbl.TextColor3 = Color3.fromRGB(255, 50, 220)
+    lbl.TextStrokeTransparency = 0.2
+    lbl.Font = Enum.Font.SourceSansBold
+    lbl.TextSize = 12
+    lbl.TextWrapped = true
 
-    task.delay(10, function()
-        if sel and sel.Parent then sel:Destroy() end
-    end)
+    table.insert(activeHitboxVisuals, part)
 end
 
-createToggle(visualsPage, "🔮 Скрытые хитбоксы (Ураган, Притяжение — 10 сек)", function(Value)
+createToggle(visualsPage, "🔮 Скрытые хитбоксы (Ураган, Притяжение)", function(Value)
     hiddenHitboxesEnabled = Value
-    if not hiddenHitboxesEnabled then return end
+    
+    if not hiddenHitboxesEnabled then
+        for _, part in ipairs(activeHitboxVisuals) do
+            if part and part.Parent then
+                local hl = part:FindFirstChild("PromptHitboxBox")
+                if hl then hl:Destroy() end
+                local bbg = part:FindFirstChild("PromptHitboxInfo")
+                if bbg then bbg:Destroy() end
+            end
+        end
+        activeHitboxVisuals = {}
+        return
+    end
+
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        attachDynamicHitboxVisual(obj)
+    end
 
     local descConn
     descConn = workspace.DescendantAdded:Connect(function(obj)
@@ -2857,13 +2877,15 @@ createToggle(visualsPage, "🔮 Скрытые хитбоксы (Ураган, �
 
     task.spawn(function()
         while hiddenHitboxesEnabled and not _G.ScriptDestroyed do
-            task.wait(0.5)
+            for i = #activeHitboxVisuals, 1, -1 do
+                local part = activeHitboxVisuals[i]
+                if not part or not part.Parent then
+                    table.remove(activeHitboxVisuals, i)
+                end
+            end
+            task.wait(1)
         end
         if descConn then descConn:Disconnect() end
-        for _, box in ipairs(activeHitboxVisuals) do
-            if box and box.Parent then box:Destroy() end
-        end
-        activeHitboxVisuals = {}
     end)
 end)
 
@@ -3346,32 +3368,54 @@ end)
 
 createToggle(visualsPage, "💎 Подсветка предметов и лута на карте", function(Value)
     lootEspEnabled = Value
-    if not lootEspEnabled then return end
+    if not lootEspEnabled then 
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            local hl = obj:FindFirstChild("PromptLootESP")
+            if hl then hl:Destroy() end
+        end
+        return 
+    end
 
     task.spawn(function()
         while lootEspEnabled and not _G.ScriptDestroyed do
-            for _, obj in ipairs(workspace:GetDescendants()) do
-                if obj:IsA("Tool") and not Players:GetPlayerFromCharacter(obj.Parent) then
-                    local handle = obj:FindFirstChild("Handle") or obj:FindFirstChildOfClass("BasePart")
-                    if handle and not obj:FindFirstChild("PromptLootESP") then
-                        local hl = Instance.new("Highlight")
-                        hl.Name = "PromptLootESP"
-                        hl.FillColor = Color3.fromRGB(60, 220, 255)
-                        hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-                        hl.Parent = obj
+            if not _G.ScriptPaused then
+                for _, obj in ipairs(workspace:GetDescendants()) do
+                    if obj:IsA("BasePart") or obj:IsA("Tool") or obj:IsA("Model") then
+                        local isPlayer = false
+                        local parent = obj.Parent
+                        while parent do
+                            if parent:IsA("Model") and Players:GetPlayerFromCharacter(parent) then
+                                isPlayer = true
+                                break
+                            end
+                            parent = parent.Parent
+                        end
+                        
+                        if not isPlayer and not obj:FindFirstChild("PromptLootESP") then
+                            local lowerName = obj.Name:lower()
+                            local parentName = obj.Parent and obj.Parent.Name:lower() or ""
+                            
+                            if lowerName:find("coin") or lowerName:find("cash") or lowerName:find("gem") or 
+                               lowerName:find("drop") or lowerName:find("item") or lowerName:find("loot") or
+                               lowerName:find("money") or lowerName:find("gold") or
+                               parentName:find("drop") or parentName:find("loot") or parentName:find("item") then
+                               
+                                local hl = Instance.new("Highlight")
+                                hl.Name = "PromptLootESP"
+                                hl.FillColor = Color3.fromRGB(60, 220, 255)
+                                hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                                hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                                hl.Parent = obj
+                            end
+                        end
                     end
                 end
             end
             task.wait(1)
         end
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            local hl = obj:FindFirstChild("PromptLootESP")
-            if hl then hl:Destroy() end
-        end
     end)
 end)
 
-end
 -- =========================================================
 -- ----- КОНЕЦ ЧАСТИ 7.4 -----
 -- =========================================================
