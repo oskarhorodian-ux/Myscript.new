@@ -3443,13 +3443,13 @@ end
 -- =========================================================
 -- ----- КОНЕЦ ЧАСТИ 8.1 -----
 -- =========================================================
--- ==========================================
+-- =========================================================
 -- ----- НАЧАЛО ЧАСТИ 8.2 -----
--- ==========================================
+-- =========================================================
+
 do
 
 local autoMathSolverEnabled = false
-local crazyDecoyEnabled = false
 
 local function evaluateMathExpression(rawText)
     if not rawText or type(rawText) ~= "string" then return nil, nil end
@@ -3614,7 +3614,6 @@ createToggle(farmPage, "🧮 Авто-решатель примеров (Экр�
     end)
 end)
 
--- вот тут находится конец 1 блока (части 8.2)
 local calcBaseTitle = "🔢 Калькулятор (ответ рядом с заголовком)"
 local calcParaFrame = createParagraph(farmPage, calcBaseTitle, "Введите пример ниже (например: 16*3)")
 
@@ -3658,212 +3657,231 @@ createInput(farmPage, "Ввести пример вручную", "Пример:
         updateCalcDisplay("Ошибка", Text)
     end
 end)
+-- =========================================================
+-- 🖤 ЧЕРНИЛЬНЫЙ ДАЙВИНГ (INK DIVE + ПОЛУПРОЗРАЧНАЯ КУКЛА)
+-- =========================================================
+local bendyHudEnabled = false
+local bendyDiveActive = false
+local bendyProxyRig = nil
+local bendyConnStepped = nil
+local bendyConnHeartbeat = nil
+local bendyHudGui = nil
 
-local crazyDecoyModel = nil
-local crazyDecoyEnabled = false
+local function stopBendyDive(teleportBack)
+    if bendyConnStepped then bendyConnStepped:Disconnect() bendyConnStepped = nil end
+    if bendyConnHeartbeat then bendyConnHeartbeat:Disconnect() bendyConnHeartbeat = nil end
 
-local function destroyCrazyDecoy()
-    if crazyDecoyModel then
-        pcall(function() crazyDecoyModel:Destroy() end)
-        crazyDecoyModel = nil
+    local char = Player.Character
+    local realHrp = char and char:FindFirstChild("HumanoidRootPart")
+    local realHum = char and char:FindFirstChildOfClass("Humanoid")
+
+    if bendyProxyRig then
+        local pHrp = bendyProxyRig:FindFirstChild("HumanoidRootPart")
+        if teleportBack and realHrp and pHrp then
+            realHrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            realHrp.CFrame = pHrp.CFrame + Vector3.new(0, 1.5, 0)
+        end
+        pcall(function() bendyProxyRig:Destroy() end)
+        bendyProxyRig = nil
+    end
+
+    if char then
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = (part.Name == "HumanoidRootPart" or part.Name == "Torso" or part.Name == "UpperTorso" or part.Name == "LowerTorso")
+            end
+        end
+    end
+
+    if realHum then
+        realHum.PlatformStand = false
+        realHum:ChangeState(Enum.HumanoidStateType.GettingUp)
+        workspace.CurrentCamera.CameraSubject = realHum
     end
 end
 
-createToggle(farmPage, "🤡 Безумный клон-приманка (Живой игрок)", function(Value)
-    crazyDecoyEnabled = Value
-    destroyCrazyDecoy()
-
-    if not crazyDecoyEnabled then return end
-
+local function startBendyDive(hudBtn)
     local char = Player.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local realHrp = char and char:FindFirstChild("HumanoidRootPart")
+    local realHum = char and char:FindFirstChildOfClass("Humanoid")
+    if not realHrp or not realHum then return end
 
-    local walkAnimTemplate, jumpAnimTemplate
-    local origAnimate = char:FindFirstChild("Animate")
-    if origAnimate then
-        local runVal = origAnimate:FindFirstChild("run") or origAnimate:FindFirstChild("walk")
-        if runVal then
-            local anim = runVal:FindFirstChildOfClass("Animation")
-            if anim then walkAnimTemplate = anim:Clone() end
+    local walkAnim, jumpAnim
+    local origAnim = char:FindFirstChild("Animate")
+    if origAnim then
+        local r = origAnim:FindFirstChild("run") or origAnim:FindFirstChild("walk")
+        if r and r:FindFirstChildOfClass("Animation") then
+            walkAnim = r:FindFirstChildOfClass("Animation"):Clone()
         end
-        local jumpVal = origAnimate:FindFirstChild("jump")
-        if jumpVal then
-            local anim = jumpVal:FindFirstChildOfClass("Animation")
-            if anim then jumpAnimTemplate = anim:Clone() end
+        local j = origAnim:FindFirstChild("jump")
+        if j and j:FindFirstChildOfClass("Animation") then
+            jumpAnim = j:FindFirstChildOfClass("Animation"):Clone()
         end
     end
 
     char.Archivable = true
-    local decoy = char:Clone()
+    local proxy = char:Clone()
     char.Archivable = false
-    decoy.Name = "PromptCrazyDecoy_Active"
+    proxy.Name = "BendySurfacePuppet"
 
-    for _, obj in ipairs(decoy:GetDescendants()) do
+    for _, obj in ipairs(proxy:GetDescendants()) do
         if obj:IsA("LocalScript") or obj:IsA("Script") or obj:IsA("ForceField") then
             obj:Destroy()
         elseif obj:IsA("BasePart") then
             obj.Anchored = false
+            obj.Material = Enum.Material.ForceField
+            obj.Color = Color3.fromRGB(35, 35, 45)
+            obj.Transparency = (obj.Name == "HumanoidRootPart") and 1 or 0.55
             obj.CanCollide = (obj.Name == "HumanoidRootPart" or obj.Name == "Torso" or obj.Name == "UpperTorso" or obj.Name == "LowerTorso")
+        elseif obj:IsA("Decal") or obj:IsA("Texture") then
+            obj.Transparency = 0.55
         end
     end
 
-    local dHrp = decoy:FindFirstChild("HumanoidRootPart")
-    local dHum = decoy:FindFirstChildOfClass("Humanoid")
-    if not dHrp or not dHum then
-        decoy:Destroy()
+    local pHrp = proxy:FindFirstChild("HumanoidRootPart")
+    local pHum = proxy:FindFirstChildOfClass("Humanoid")
+    if not pHrp or not pHum then
+        proxy:Destroy()
         return
     end
 
-    dHum.DisplayName = Player.DisplayName
-    dHum.WalkSpeed = 16
-    dHum.JumpPower = 50
-    dHum.PlatformStand = false
-    dHum.AutoRotate = true
-    decoy.Parent = workspace
-    crazyDecoyModel = decoy
+    pHum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+    pHum.WalkSpeed = realHum.WalkSpeed
+    pHum.JumpPower = realHum.JumpPower
+    pHum.UseJumpPower = realHum.UseJumpPower
+    pHum.JumpHeight = realHum.JumpHeight
+    pHum.AutoRotate = true
+    proxy.Parent = workspace
+    bendyProxyRig = proxy
 
-    decoy:PivotTo(char.HumanoidRootPart.CFrame * CFrame.new(4, 1, 4))
+    proxy:PivotTo(realHrp.CFrame)
+    workspace.CurrentCamera.CameraSubject = pHum
 
+    local animator = pHum:FindFirstChildOfClass("Animator") or Instance.new("Animator", pHum)
     local walkTrack, jumpTrack
-    local animator = dHum:FindFirstChildOfClass("Animator") or Instance.new("Animator", dHum)
-    if walkAnimTemplate then
-        walkAnimTemplate.Parent = decoy
-        walkTrack = animator:LoadAnimation(walkAnimTemplate)
+    if walkAnim then
+        walkAnim.Parent = proxy
+        walkTrack = animator:LoadAnimation(walkAnim)
         walkTrack.Looped = true
     end
-    if jumpAnimTemplate then
-        jumpAnimTemplate.Parent = decoy
-        jumpTrack = animator:LoadAnimation(jumpAnimTemplate)
+    if jumpAnim then
+        jumpAnim.Parent = proxy
+        jumpTrack = animator:LoadAnimation(jumpAnim)
         jumpTrack.Looped = false
     end
 
-    dHum.Running:Connect(function(speed)
+    pHum.Running:Connect(function(spd)
         if not walkTrack then return end
-        if speed > 1 then
+        if spd > 1 then
             if not walkTrack.IsPlaying then walkTrack:Play(0.15) end
-            walkTrack:AdjustSpeed(speed / 16)
+            walkTrack:AdjustSpeed(spd / 16)
         else
             if walkTrack.IsPlaying then walkTrack:Stop(0.15) end
         end
     end)
 
-    dHum.StateChanged:Connect(function(_, newState)
+    pHum.StateChanged:Connect(function(_, state)
         if not jumpTrack then return end
-        if newState == Enum.HumanoidStateType.Jumping or newState == Enum.HumanoidStateType.Freefall then
+        if state == Enum.HumanoidStateType.Jumping or state == Enum.HumanoidStateType.Freefall then
             if not jumpTrack.IsPlaying then jumpTrack:Play(0.1) end
         else
             if jumpTrack.IsPlaying then jumpTrack:Stop(0.15) end
         end
     end)
 
-    task.spawn(function()
-        local nextRouteTick = 0
-        local nextJumpTick = tick() + (math.random(10, 100) / 10)
-        local lastPos = dHrp.Position
-        local stuckChecks = 0
-        local lastSafePos = dHrp.Position
-
-        local groundParams = RaycastParams.new()
-        groundParams.FilterType = Enum.RaycastFilterType.Exclude
-        groundParams.FilterDescendantsInstances = {decoy, char}
-
-        -- высота земли под точкой (nil = под ней пустота)
-        local function groundYAt(pos)
-            local hit = workspace:Raycast(Vector3.new(pos.X, pos.Y + 6, pos.Z), Vector3.new(0, -120, 0), groundParams)
-            return hit and hit.Position.Y or nil
-        end
-
-        -- проверка, что путь к точке сплошной: без дыр и обрывов
-        local function pathIsSafe(fromPos, toPos)
-            local dir = toPos - fromPos
-            local steps = math.max(2, math.floor(dir.Magnitude / 5))
-            local prevY = groundYAt(fromPos)
-            if not prevY then return false end
-            for i = 1, steps do
-                local p = fromPos + dir * (i / steps)
-                local gy = groundYAt(Vector3.new(p.X, prevY + 4, p.Z))
-                if not gy then return false end
-                if math.abs(gy - prevY) > 5 then return false end
-                prevY = gy
+    bendyConnStepped = RunService.Stepped:Connect(function()
+        if not bendyDiveActive or not char.Parent then return end
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
             end
-            return true
         end
+    end)
 
-        while crazyDecoyEnabled and decoy.Parent and not _G.ScriptDestroyed do
-            if not _G.ScriptPaused and dHum.Health > 0 then
-                local now = tick()
-
-                if now >= nextRouteTick then
-                    nextRouteTick = now + (math.random(18, 42) / 10)
-                    local picked = nil
-                    for _ = 1, 10 do
-                        local roamOffset = Vector3.new(math.random(-60, 60), 0, math.random(-60, 60))
-                        local dest = dHrp.Position + roamOffset
-                        if pathIsSafe(dHrp.Position, dest) then
-                            picked = dest
-                            break
-                        end
-                    end
-                    if picked then
-                        dHum:MoveTo(picked)
-                    else
-                        -- безопасного пути нет: возвращаемся к своему персонажу
-                        local myHrp = char and char:FindFirstChild("HumanoidRootPart")
-                        if myHrp then dHum:MoveTo(myHrp.Position) else dHum:MoveTo(lastSafePos) end
-                    end
-                end
-
-                -- край впереди: нет пола в 4 студах -> стоп и новый маршрут
-                local ahead = dHrp.Position + dHrp.CFrame.LookVector * 4
-                if dHum.FloorMaterial ~= Enum.Material.Air and not groundYAt(ahead) then
-                    dHum:MoveTo(dHrp.Position)
-                    nextRouteTick = 0
-                end
-
-                -- запоминаем последнюю безопасную позицию; упал в пустоту -> возвращаем
-                if dHum.FloorMaterial ~= Enum.Material.Air then
-                    lastSafePos = dHrp.Position
-                elseif dHrp.Position.Y < lastSafePos.Y - 40 or dHrp.Position.Y < workspace.FallenPartsDestroyHeight + 60 then
-                    decoy:PivotTo(CFrame.new(lastSafePos + Vector3.new(0, 3, 0)))
-                    dHrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                    nextRouteTick = 0
-                end
-
-                if now >= nextJumpTick then
-                    nextJumpTick = now + (math.random(10, 100) / 10)
-                    dHum.Jump = true
-                end
-
-                local rayParams = RaycastParams.new()
-                rayParams.FilterType = Enum.RaycastFilterType.Exclude
-                rayParams.FilterDescendantsInstances = {decoy, char}
-                local wallHit = workspace:Raycast(dHrp.Position, dHrp.CFrame.LookVector * 3.8, rayParams)
-                if wallHit then
-                    dHum.Jump = true
-                end
-
-                if (dHrp.Position - lastPos).Magnitude < 0.4 then
-                    stuckChecks = stuckChecks + 1
-                    if stuckChecks >= 8 then
-                        stuckChecks = 0
-                        nextRouteTick = 0
-                        dHum.Jump = true
-                    end
-                else
-                    stuckChecks = 0
-                end
-                lastPos = dHrp.Position
+    local bob = 0
+    bendyConnHeartbeat = RunService.Heartbeat:Connect(function()
+        if not bendyDiveActive then return end
+        if _G.ScriptDestroyed or not char.Parent or not realHrp.Parent or not proxy.Parent or realHum.Health <= 0 then
+            bendyDiveActive = false
+            if hudBtn then
+                hudBtn.Text = "OFF"
+                hudBtn.BackgroundColor3 = Color3.fromRGB(205, 55, 45)
             end
-            task.wait(0.15)
+            stopBendyDive(false)
+            return
         end
-        destroyCrazyDecoy()
+
+        pHum.WalkSpeed = realHum.WalkSpeed
+        pHum:Move(realHum.MoveDirection, false)
+        if realHum.Jump then
+            pHum.Jump = true
+        end
+
+        bob = (bob == 0) and 0.1 or 0
+        local voidLimit = workspace.FallenPartsDestroyHeight + 3
+        local deepY = math.max(pHrp.Position.Y - 35 + bob, voidLimit)
+
+        realHum:ChangeState(Enum.HumanoidStateType.Physics)
+        realHrp.AssemblyLinearVelocity = Vector3.new(0, 0.4, 0)
+        realHrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+        realHrp.CFrame = CFrame.new(pHrp.Position.X, deepY, pHrp.Position.Z) * (pHrp.CFrame - pHrp.CFrame.Position)
+    end)
+end
+
+local function destroyBendyHud()
+    bendyDiveActive = false
+    stopBendyDive(true)
+    if bendyHudGui then
+        pcall(function() bendyHudGui:Destroy() end)
+        bendyHudGui = nil
+    end
+end
+
+createToggle(farmPage, "🖤 Чернильный дайвинг (Кукла + кнопка OFF/ON)", function(Value)
+    bendyHudEnabled = Value
+    destroyBendyHud()
+
+    if not bendyHudEnabled then return end
+
+    local hGui = Instance.new("ScreenGui")
+    hGui.Name = "PromptBendyDiveHUD"
+    hGui.ResetOnSpawn = false
+    hGui.Parent = game:GetService("CoreGui") or Player:WaitForChild("PlayerGui")
+    bendyHudGui = hGui
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 115, 0, 48)
+    btn.Position = UDim2.new(1, -135, 0.35, 0)
+    btn.BackgroundColor3 = Color3.fromRGB(205, 55, 45)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 18
+    btn.Text = "OFF"
+    btn.Active = true
+    btn.Draggable = true
+    btn.Parent = hGui
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+
+    btn.MouseButton1Click:Connect(function()
+        bendyDiveActive = not bendyDiveActive
+        if bendyDiveActive then
+            btn.Text = "ON"
+            btn.BackgroundColor3 = Color3.fromRGB(45, 175, 55)
+            startBendyDive(btn)
+        else
+            btn.Text = "OFF"
+            btn.BackgroundColor3 = Color3.fromRGB(205, 55, 45)
+            stopBendyDive(true)
+        end
     end)
 end)
+
 end
 end
--- ==========================================
+
+-- =========================================================
 -- ----- КОНЕЦ ЧАСТИ 8.2 -----
--- ==========================================
+-- =========================================================
 -- =========================================================
 -- ----- НАЧАЛО ЧАСТИ 9.1 -----
 -- =========================================================
