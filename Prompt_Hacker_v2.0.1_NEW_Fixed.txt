@@ -2909,11 +2909,11 @@ local function registerPlayerTool(pData, toolObj)
 
     if not pData.HookedTools[toolObj] then
         pData.HookedTools[toolObj] = true
-        toolObj.Activated:Connect(function()
+        table.insert(pData.Connections, toolObj.Activated:Connect(function()
             local cd = toolObj:GetAttribute("Cooldown") or toolObj:GetAttribute("CD") or 4
             if type(cd) ~= "number" or cd <= 0 then cd = 4 end
             pData.Cooldowns[slotIdx] = tick() + cd
-        end)
+        end))
     end
 end
 
@@ -2924,51 +2924,37 @@ local function setupPlayerCdTracker(plr, char, hum)
         NameToSlot = {},
         Cooldowns = {},
         HookedTools = {},
-        LastAnimTime = 0
+        LastAnimTime = 0,
+        Connections = {}
     }
     playerCooldownData[plr] = pData
 
-    char.ChildAdded:Connect(function(child)
+    table.insert(pData.Connections, char.ChildAdded:Connect(function(child)
         if child:IsA("Tool") then registerPlayerTool(pData, child) end
-    end)
+    end))
 
     local animator = hum:FindFirstChildOfClass("Animator")
-    if not animator then return pData end
-
-    animator.AnimationPlayed:Connect(function(track)
-        if tick() - pData.LastAnimTime < 0.45 then return end
-        local animName = track.Animation and track.Animation.Name:lower() or ""
-        if animName:find("walk") or animName:find("run") or animName:find("idle") or animName:find("jump") or animName:find("fall") then
-            return
-        end
-        pData.LastAnimTime = tick()
-
-        local heldTool = char:FindFirstChildOfClass("Tool")
-        if heldTool then
-            registerPlayerTool(pData, heldTool)
-            local sIdx = pData.NameToSlot[heldTool.Name]
-            if sIdx and (not pData.Cooldowns[sIdx] or pData.Cooldowns[sIdx] < tick()) then
-                local cd = heldTool:GetAttribute("Cooldown") or heldTool:GetAttribute("CD") or 4
-                if type(cd) ~= "number" or cd <= 0 then cd = 4 end
-                pData.Cooldowns[sIdx] = tick() + cd
+    if animator then
+        table.insert(pData.Connections, animator.AnimationPlayed:Connect(function(track)
+            if tick() - pData.LastAnimTime < 0.45 then return end
+            local animName = track.Animation and track.Animation.Name:lower() or ""
+            if animName:find("walk") or animName:find("run") or animName:find("idle") or animName:find("jump") or animName:find("fall") then
+                return
             end
-            return
-        end
+            pData.LastAnimTime = tick()
 
-        if #pData.SlotNames == 0 then
-            for k = 1, 4 do
-                local sName = "Скилл " .. k
-                table.insert(pData.SlotNames, sName)
-                pData.NameToSlot[sName] = k
+            local heldTool = char:FindFirstChildOfClass("Tool")
+            if heldTool then
+                registerPlayerTool(pData, heldTool)
+                local sIdx = pData.NameToSlot[heldTool.Name]
+                if sIdx and (not pData.Cooldowns[sIdx] or pData.Cooldowns[sIdx] < tick()) then
+                    local cd = heldTool:GetAttribute("Cooldown") or heldTool:GetAttribute("CD") or 4
+                    if type(cd) ~= "number" or cd <= 0 then cd = 4 end
+                    pData.Cooldowns[sIdx] = tick() + cd
+                end
             end
-        end
-        for k = 1, #pData.SlotNames do
-            if not pData.Cooldowns[k] or pData.Cooldowns[k] < tick() then
-                pData.Cooldowns[k] = tick() + 5
-                break
-            end
-        end
-    end)
+        end))
+    end
 
     return pData
 end
@@ -2976,6 +2962,12 @@ end
 local function renderPlayerCdSlots(head, pData, equippedTool)
     local totalSlots = #pData.SlotNames
     local bbg = head:FindFirstChild("PromptCDTracker")
+    
+    if totalSlots == 0 then
+        if bbg then bbg.Enabled = false end
+        return
+    end
+
     if not bbg then
         bbg = Instance.new("BillboardGui")
         bbg.Name = "PromptCDTracker"
@@ -2994,70 +2986,131 @@ local function renderPlayerCdSlots(head, pData, equippedTool)
         layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
         layout.Padding = UDim.new(0, 3)
     end
-
-    bbg.Size = UDim2.new(0, math.max(totalSlots, 1) * 34 + 12, 0, 34)
+    
+    bbg.Enabled = true
+    bbg.Size = UDim2.new(0, totalSlots * 34 + 12, 0, 34)
     local container = bbg:FindFirstChild("SlotsRow")
-    if not container then return end
-
+    
+    -- Пересоздаем слоты только если изменилось их количество
+    local currentFrames = 0
     for _, ch in ipairs(container:GetChildren()) do
-        if ch:IsA("Frame") then ch:Destroy() end
+        if ch:IsA("Frame") then currentFrames = currentFrames + 1 end
     end
 
-    if totalSlots == 0 then
-        local emptyBadge = Instance.new("Frame", container)
-        emptyBadge.Size = UDim2.new(0, 76, 0, 24)
-        emptyBadge.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-        Instance.new("UICorner", emptyBadge).CornerRadius = UDim.new(0, 5)
-        local lbl = Instance.new("TextLabel", emptyBadge)
-        lbl.Size = UDim2.new(1, 0, 1, 0)
-        lbl.BackgroundTransparency = 1
-        lbl.Text = "Жду скилл..."
-        lbl.TextColor3 = Color3.fromRGB(180, 180, 180)
-        lbl.Font = Enum.Font.SourceSansBold
-        lbl.TextSize = 11
-        return
+    if currentFrames ~= totalSlots then
+        for _, ch in ipairs(container:GetChildren()) do
+            if ch:IsA("Frame") then ch:Destroy() end
+        end
+
+        for i = 1, totalSlots do
+            local slotFrame = Instance.new("Frame", container)
+            slotFrame.Size = UDim2.new(0, 30, 0, 30)
+            Instance.new("UICorner", slotFrame).CornerRadius = UDim.new(0, 5)
+
+            local topNum = Instance.new("TextLabel", slotFrame)
+            topNum.Name = "Num"
+            topNum.Size = UDim2.new(1, 0, 0, 11)
+            topNum.BackgroundTransparency = 1
+            topNum.Text = tostring(i)
+            topNum.TextColor3 = Color3.fromRGB(230, 230, 230)
+            topNum.Font = Enum.Font.SourceSansBold
+            topNum.TextSize = 9
+
+            local statusTxt = Instance.new("TextLabel", slotFrame)
+            statusTxt.Name = "Status"
+            statusTxt.Size = UDim2.new(1, 0, 0, 18)
+            statusTxt.Position = UDim2.new(0, 0, 0, 11)
+            statusTxt.BackgroundTransparency = 1
+            statusTxt.Font = Enum.Font.SourceSansBold
+            statusTxt.TextSize = 10
+        end
     end
 
-    for i = 1, totalSlots do
-        local sName = pData.SlotNames[i]
-        local slotFrame = Instance.new("Frame", container)
-        slotFrame.Size = UDim2.new(0, 30, 0, 30)
-        Instance.new("UICorner", slotFrame).CornerRadius = UDim.new(0, 5)
+    -- Обновляем инфу в существующих слотах
+    local idx = 0
+    for _, slotFrame in ipairs(container:GetChildren()) do
+        if slotFrame:IsA("Frame") then
+            idx = idx + 1
+            local sName = pData.SlotNames[idx]
+            local statusTxt = slotFrame:FindFirstChild("Status")
+            
+            local cdEnd = pData.Cooldowns[idx]
+            local rem = cdEnd and (cdEnd - tick()) or 0
+            local isHeld = equippedTool and (equippedTool.Name == sName)
 
-        local topNum = Instance.new("TextLabel", slotFrame)
-        topNum.Size = UDim2.new(1, 0, 0, 11)
-        topNum.BackgroundTransparency = 1
-        topNum.Text = tostring(i)
-        topNum.TextColor3 = Color3.fromRGB(230, 230, 230)
-        topNum.Font = Enum.Font.SourceSansBold
-        topNum.TextSize = 9
-
-        local statusTxt = Instance.new("TextLabel", slotFrame)
-        statusTxt.Size = UDim2.new(1, 0, 0, 18)
-        statusTxt.Position = UDim2.new(0, 0, 0, 11)
-        statusTxt.BackgroundTransparency = 1
-        statusTxt.Font = Enum.Font.SourceSansBold
-        statusTxt.TextSize = 10
-
-        local cdEnd = pData.Cooldowns[i]
-        local rem = cdEnd and (cdEnd - tick()) or 0
-        local isHeld = equippedTool and (equippedTool.Name == sName)
-
-        if rem > 0 then
-            slotFrame.BackgroundColor3 = Color3.fromRGB(195, 45, 45)
-            statusTxt.Text = string.format("%.1f", rem)
-            statusTxt.TextColor3 = Color3.fromRGB(255, 255, 255)
-        elseif isHeld then
-            slotFrame.BackgroundColor3 = Color3.fromRGB(225, 185, 40)
-            statusTxt.Text = sName:sub(1, 3)
-            statusTxt.TextColor3 = Color3.fromRGB(20, 20, 20)
-        else
-            slotFrame.BackgroundColor3 = Color3.fromRGB(45, 155, 65)
-            statusTxt.Text = sName:sub(1, 3)
-            statusTxt.TextColor3 = Color3.fromRGB(255, 255, 255)
+            if rem > 0 then
+                slotFrame.BackgroundColor3 = Color3.fromRGB(195, 45, 45)
+                statusTxt.Text = string.format("%.1f", rem)
+                statusTxt.TextColor3 = Color3.fromRGB(255, 255, 255)
+            elseif isHeld then
+                slotFrame.BackgroundColor3 = Color3.fromRGB(225, 185, 40)
+                statusTxt.Text = sName:sub(1, 3)
+                statusTxt.TextColor3 = Color3.fromRGB(20, 20, 20)
+            else
+                slotFrame.BackgroundColor3 = Color3.fromRGB(45, 155, 65)
+                statusTxt.Text = sName:sub(1, 3)
+                statusTxt.TextColor3 = Color3.fromRGB(255, 255, 255)
+            end
         end
     end
 end
+
+createToggle(visualsPage, "⏱ Трекер КД над головой (Умные слоты 1–9)", function(Value)
+    cdTrackerEnabled = Value
+    
+    -- Очистка при выключении, чтобы не лагало
+    if not cdTrackerEnabled then
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr.Character and plr.Character:FindFirstChild("Head") then
+                local gui = plr.Character.Head:FindFirstChild("PromptCDTracker")
+                if gui then gui:Destroy() end
+            end
+        end
+        for _, pData in pairs(playerCooldownData) do
+            for _, conn in ipairs(pData.Connections) do conn:Disconnect() end
+        end
+        playerCooldownData = {}
+        return 
+    end
+
+    task.spawn(function()
+        while cdTrackerEnabled and not _G.ScriptDestroyed do
+            for _, plr in ipairs(Players:GetPlayers()) do
+                if plr ~= Player and plr.Character then
+                    local char = plr.Character
+                    local head = char:FindFirstChild("Head")
+                    local hum = char:FindFirstChildOfClass("Humanoid")
+                    if head and hum and hum.Health > 0 then
+                        local pData = playerCooldownData[plr]
+                        if not pData or pData.Char ~= char then
+                            if pData then
+                                for _, conn in ipairs(pData.Connections) do conn:Disconnect() end
+                            end
+                            pData = setupPlayerCdTracker(plr, char, hum)
+                        end
+                        local eq = char:FindFirstChildOfClass("Tool")
+                        if eq then registerPlayerTool(pData, eq) end
+                        local bp = plr:FindFirstChildOfClass("Backpack")
+                        if bp then
+                            for _, it in ipairs(bp:GetChildren()) do
+                                if it:IsA("Tool") then registerPlayerTool(pData, it) end
+                            end
+                        end
+                        renderPlayerCdSlots(head, pData, eq)
+                    end
+                end
+            end
+            task.wait(0.1) -- Сделал чуть быстрее для плавности таймера
+        end
+
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr.Character and plr.Character:FindFirstChild("Head") then
+                local gui = plr.Character.Head:FindFirstChild("PromptCDTracker")
+                if gui then gui:Destroy() end
+            end
+        end
+    end)
+end)
 
 createToggle(visualsPage, "⏱ Трекер КД над головой (Умные слоты 1–9)", function(Value)
     cdTrackerEnabled = Value
