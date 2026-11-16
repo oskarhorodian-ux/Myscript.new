@@ -1672,7 +1672,7 @@ createToggle(movePage, "✈ Активировать WASD-Полет Кнопк�
 end)
 
 -- СВОБОДНАЯ КАМЕРА (FREECAM С ПОВОРОТОМ ПАЛЬЦЕМ / МЫШЬЮ И WASD)
-createToggle(movePage, "🎥 Свободная камера (Freecam)", function(Value)
+createToggle(visualsPage, "🎥 Свободная камера (Freecam)", function(Value)
     freecamEnabled = Value
     if freecamEnabled and flying then
         flying = false
