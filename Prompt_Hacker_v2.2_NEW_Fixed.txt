@@ -3668,78 +3668,7 @@ end)
 local airFreezeEnabled = false
 local airFreezeConnection = nil
 
-createToggle(farmPage, "❄️ Зависание в воздухе (Air Freeze)", function(Value)
-    airFreezeEnabled = Value
-    
-    if airFreezeConnection then
-        airFreezeConnection:Disconnect()
-        airFreezeConnection = nil
-    end
-
-    local char = Player.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-
-    if airFreezeEnabled then
-        if hrp then
-            hrp.Anchored = true
-            hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-            hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-        end
-        if hum then
-            hum.PlatformStand = true
-            local animator = hum:FindFirstChildOfClass("Animator")
-            if animator then
-                for _, track in pairs(animator:GetPlayingAnimationTracks()) do
-                    track.Speed = 0
-                end
-            end
-        end
-
-        airFreezeConnection = RunService.Heartbeat:Connect(function()
-            if not airFreezeEnabled or _G.ScriptDestroyed then return end
-            local c = Player.Character
-            local h = c and c:FindFirstChild("HumanoidRootPart")
-            local u = c and c:FindFirstChildOfClass("Humanoid")
-            
-            if h then
-                h.Anchored = true
-                h.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-            end
-            if u then
-                u.PlatformStand = true
-            end
-        end)
-    else
-        if hrp then
-            hrp.Anchored = false
-            hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-        end
-        if hum then
-            hum.PlatformStand = false
-            hum:ChangeState(Enum.HumanoidStateType.GettingUp)
-            local animator = hum:FindFirstChildOfClass("Animator")
-            if animator then
-                for _, track in pairs(animator:GetPlayingAnimationTracks()) do
-                    track.Speed = 1
-                end
-            end
-        end
-    end
-end)
-
-Player.CharacterRemoving:Connect(function()
-    if airFreezeConnection then
-        airFreezeConnection:Disconnect()
-        airFreezeConnection = nil
-    end
-    airFreezeEnabled = false
-end)
--- ❄️ ЗАВИСАНИЕ В ВОЗДУХЕ (AIR FREEZE)
-local airFreezeEnabled = false
-local airFreezeConnection = nil
-
-createToggle(farmPage, "❄️ Зависание в воздухе (Air Freeze)", function(Value)
+createToggle(movePage, "❄️ Зависание в воздухе (Air Freeze)", function(Value)
     airFreezeEnabled = Value
     
     if airFreezeConnection then
@@ -3987,7 +3916,7 @@ local function destroyBendyHud()
     end
 end
 
-createToggle(farmPage, "🖤 Чернильный дайвинг (Кукла + кнопка OFF/ON)", function(Value)
+createToggle(mainPage, "🖤 Чернильный дайвинг (Кукла + кнопка OFF/ON)", function(Value)
     bendyHudEnabled = Value
     destroyBendyHud()
 
