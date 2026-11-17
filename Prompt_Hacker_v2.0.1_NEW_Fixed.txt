@@ -1800,11 +1800,29 @@ local topNotif = nil
 local selectedType = nil
 local blockSizeValue = 5
 
+-- 🏗️ РЕЖИМ СТРОЙКИ (BUILDER MODE - 3D ROTATION)
+local builderModeEnabled = false
+local builderGui = nil
+local topNotif = nil
+local selectedType = nil
+local blockSizeValue = 5
+
+-- Переменные для 3D-поворота
+local rotX = 0
+local rotY = 0
+local rotZ = 0
+
+local placedBlocksList = {}
+local wallCount = 0
+local floorCount = 0
+local currentlySelectedBlock = nil
+local dragActive = false
+local currentPreviewPart = nil
+
 createToggle(movePage, "🏗️ Режим Стройки (Builder)", function(Value)
     builderModeEnabled = Value
     
     if builderModeEnabled then
-        -- Верхнее уведомление
         if not topNotif then
             topNotif = Instance.new("TextLabel")
             topNotif.Size = UDim2.new(0, 250, 0, 40)
@@ -1820,11 +1838,10 @@ createToggle(movePage, "🏗️ Режим Стройки (Builder)", function(V
         end
         topNotif.Visible = true
         
-        -- Боковая панель
         if not builderGui then
             builderGui = Instance.new("Frame")
-            builderGui.Size = UDim2.new(0, 150, 0, 220)
-            builderGui.Position = UDim2.new(0, 10, 0.5, -110)
+            builderGui.Size = UDim2.new(0, 160, 0, 540) -- Увеличили высоту из-за новых кнопок
+            builderGui.Position = UDim2.new(0, 10, 0.5, -270)
             builderGui.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
             builderGui.Parent = ScreenGui
             builderGui.ZIndex = 75
@@ -1858,8 +1875,9 @@ createToggle(movePage, "🏗️ Режим Стройки (Builder)", function(V
                 sizeBox.Text = "Размер: " .. blockSizeValue
             end)
             
+            -- Выбор типа
             local wallBtn = Instance.new("TextButton", builderGui)
-            wallBtn.Size = UDim2.new(1, -20, 0, 35)
+            wallBtn.Size = UDim2.new(0.45, -10, 0, 30)
             wallBtn.Position = UDim2.new(0, 10, 0, 75)
             wallBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
             wallBtn.Text = "Стенка"
@@ -1869,63 +1887,242 @@ createToggle(movePage, "🏗️ Режим Стройки (Builder)", function(V
             Instance.new("UICorner", wallBtn).CornerRadius = UDim.new(0, 5)
             
             local floorBtn = Instance.new("TextButton", builderGui)
-            floorBtn.Size = UDim2.new(1, -20, 0, 35)
-            floorBtn.Position = UDim2.new(0, 10, 0, 115)
+            floorBtn.Size = UDim2.new(0.45, -10, 0, 30)
+            floorBtn.Position = UDim2.new(0.5, 5, 0, 75)
             floorBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
             floorBtn.Text = "Пол"
             floorBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
             floorBtn.Font = Enum.Font.SourceSansBold
             floorBtn.ZIndex = 76
             Instance.new("UICorner", floorBtn).CornerRadius = UDim.new(0, 5)
-            
+
+            -- КНОПКИ ВРАЩЕНИЯ (3 ОСИ)
+            -- 1. Наклон (Ось X)
+            local pitchU = Instance.new("TextButton", builderGui)
+            pitchU.Size = UDim2.new(0.45, -10, 0, 30)
+            pitchU.Position = UDim2.new(0, 10, 0, 115)
+            pitchU.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+            pitchU.Text = "↑ Наклон"
+            pitchU.TextColor3 = Color3.fromRGB(255, 255, 255)
+            pitchU.Font = Enum.Font.SourceSansBold
+            pitchU.Visible = false
+            pitchU.ZIndex = 76
+            Instance.new("UICorner", pitchU).CornerRadius = UDim.new(0, 5)
+
+            local pitchD = Instance.new("TextButton", builderGui)
+            pitchD.Size = UDim2.new(0.45, -10, 0, 30)
+            pitchD.Position = UDim2.new(0.5, 5, 0, 115)
+            pitchD.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+            pitchD.Text = "↓ Наклон"
+            pitchD.TextColor3 = Color3.fromRGB(255, 255, 255)
+            pitchD.Font = Enum.Font.SourceSansBold
+            pitchD.Visible = false
+            pitchD.ZIndex = 76
+            Instance.new("UICorner", pitchD).CornerRadius = UDim.new(0, 5)
+
+            -- 2. Поворот (Ось Y)
+            local yawL = Instance.new("TextButton", builderGui)
+            yawL.Size = UDim2.new(0.45, -10, 0, 30)
+            yawL.Position = UDim2.new(0, 10, 0, 150)
+            yawL.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+            yawL.Text = "↺ Влево"
+            yawL.TextColor3 = Color3.fromRGB(255, 255, 255)
+            yawL.Font = Enum.Font.SourceSansBold
+            yawL.Visible = false
+            yawL.ZIndex = 76
+            Instance.new("UICorner", yawL).CornerRadius = UDim.new(0, 5)
+
+            local yawR = Instance.new("TextButton", builderGui)
+            yawR.Size = UDim2.new(0.45, -10, 0, 30)
+            yawR.Position = UDim2.new(0.5, 5, 0, 150)
+            yawR.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+            yawR.Text = "↻ Вправо"
+            yawR.TextColor3 = Color3.fromRGB(255, 255, 255)
+            yawR.Font = Enum.Font.SourceSansBold
+            yawR.Visible = false
+            yawR.ZIndex = 76
+            Instance.new("UICorner", yawR).CornerRadius = UDim.new(0, 5)
+
+            -- 3. Крен (Ось Z)
+            local rollL = Instance.new("TextButton", builderGui)
+            rollL.Size = UDim2.new(0.45, -10, 0, 30)
+            rollL.Position = UDim2.new(0, 10, 0, 185)
+            rollL.BackgroundColor3 = Color3.fromRGB(50, 50, 150)
+            rollL.Text = "↶ Крен"
+            rollL.TextColor3 = Color3.fromRGB(255, 255, 255)
+            rollL.Font = Enum.Font.SourceSansBold
+            rollL.Visible = false
+            rollL.ZIndex = 76
+            Instance.new("UICorner", rollL).CornerRadius = UDim.new(0, 5)
+
+            local rollR = Instance.new("TextButton", builderGui)
+            rollR.Size = UDim2.new(0.45, -10, 0, 30)
+            rollR.Position = UDim2.new(0.5, 5, 0, 185)
+            rollR.BackgroundColor3 = Color3.fromRGB(50, 50, 150)
+            rollR.Text = "Крен ↷"
+            rollR.TextColor3 = Color3.fromRGB(255, 255, 255)
+            rollR.Font = Enum.Font.SourceSansBold
+            rollR.Visible = false
+            rollR.ZIndex = 76
+            Instance.new("UICorner", rollR).CornerRadius = UDim.new(0, 5)
+
+            -- Кнопки подтверждения и отмены
             local confirmBtn = Instance.new("TextButton", builderGui)
-            confirmBtn.Size = UDim2.new(0, 50, 0, 35)
-            confirmBtn.Position = UDim2.new(0, 10, 1, -45)
+            confirmBtn.Size = UDim2.new(0, 60, 0, 30)
+            confirmBtn.Position = UDim2.new(0, 10, 0, 225)
             confirmBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-            confirmBtn.Text = "✓"
+            confirmBtn.Text = "✅"
             confirmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
             confirmBtn.Font = Enum.Font.SourceSansBold
-            confirmBtn.TextSize = 20
+            confirmBtn.TextSize = 18
             confirmBtn.Visible = false
             confirmBtn.ZIndex = 76
             Instance.new("UICorner", confirmBtn).CornerRadius = UDim.new(0, 5)
             
             local cancelBtn = Instance.new("TextButton", builderGui)
-            cancelBtn.Size = UDim2.new(0, 50, 0, 35)
-            cancelBtn.Position = UDim2.new(1, -60, 1, -45)
+            cancelBtn.Size = UDim2.new(0, 60, 0, 30)
+            cancelBtn.Position = UDim2.new(1, -70, 0, 225)
             cancelBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-            cancelBtn.Text = "✗"
+            cancelBtn.Text = "❌"
             cancelBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
             cancelBtn.Font = Enum.Font.SourceSansBold
-            cancelBtn.TextSize = 20
+            cancelBtn.TextSize = 18
             cancelBtn.Visible = false
             cancelBtn.ZIndex = 76
             Instance.new("UICorner", cancelBtn).CornerRadius = UDim.new(0, 5)
+
+            local deleteBtn = Instance.new("TextButton", builderGui)
+            deleteBtn.Size = UDim2.new(1, -20, 0, 25)
+            deleteBtn.Position = UDim2.new(0, 10, 0, 265)
+            deleteBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+            deleteBtn.Text = "🗑️ Удалить выбранное"
+            deleteBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            deleteBtn.Font = Enum.Font.SourceSansBold
+            deleteBtn.TextSize = 11
+            deleteBtn.Visible = false
+            deleteBtn.ZIndex = 76
+            Instance.new("UICorner", deleteBtn).CornerRadius = UDim.new(0, 5)
+
+            local listLabel = Instance.new("TextLabel", builderGui)
+            listLabel.Size = UDim2.new(1, -20, 0, 20)
+            listLabel.Position = UDim2.new(0, 10, 0, 295)
+            listLabel.BackgroundTransparency = 1
+            listLabel.Text = "📦 Поставленные блоки:"
+            listLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+            listLabel.Font = Enum.Font.SourceSansBold
+            listLabel.TextSize = 11
+            listLabel.TextXAlignment = Enum.TextXAlignment.Left
+            listLabel.ZIndex = 76
+
+            local listScroll = Instance.new("ScrollingFrame", builderGui)
+            listScroll.Size = UDim2.new(1, -20, 0, 200)
+            listScroll.Position = UDim2.new(0, 10, 0, 315)
+            listScroll.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+            listScroll.BorderSizePixel = 0
+            listScroll.ScrollBarThickness = 3
+            listScroll.ZIndex = 76
+            Instance.new("UICorner", listScroll).CornerRadius = UDim.new(0, 5)
             
-            -- Логика выбора
+            local listLayout = Instance.new("UIListLayout", listScroll)
+            listLayout.Padding = UDim.new(0, 3)
+
+            -- Функция обновления позиции с учетом 3D-углов
+            local function updatePreviewPos(targetPos)
+                if currentPreviewPart then
+                    currentPreviewPart.CFrame = CFrame.new(targetPos) * CFrame.Angles(math.rad(rotX), math.rad(rotY), math.rad(rotZ))
+                end
+            end
+
+            local function refreshList()
+                for _, child in ipairs(listScroll:GetChildren()) do
+                    if child:IsA("TextButton") then child:Destroy() end
+                end
+                
+                for i, data in ipairs(placedBlocksList) do
+                    local itemBtn = Instance.new("TextButton", listScroll)
+                    itemBtn.Size = UDim2.new(1, -5, 0, 25)
+                    itemBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+                    itemBtn.Text = data.Name
+                    itemBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    itemBtn.Font = Enum.Font.SourceSans
+                    itemBtn.TextSize = 11
+                    itemBtn.ZIndex = 77
+                    Instance.new("UICorner", itemBtn).CornerRadius = UDim.new(0, 4)
+                    
+                    itemBtn.MouseButton1Click:Connect(function()
+                        if currentlySelectedBlock and currentlySelectedBlock.Highlight then
+                            currentlySelectedBlock.Highlight:Destroy()
+                        end
+                        currentlySelectedBlock = data
+                        
+                        local hl = Instance.new("SelectionBox")
+                        hl.Name = "Highlight"
+                        hl.Adornee = data.Part
+                        hl.Color3 = Color3.fromRGB(50, 255, 50)
+                        hl.LineThickness = 0.1
+                        hl.Parent = data.Part
+                        data.Highlight = hl
+                        
+                        deleteBtn.Visible = true
+                    end)
+                end
+            end
+
+            deleteBtn.MouseButton1Click:Connect(function()
+                if currentlySelectedBlock then
+                    currentlySelectedBlock.Part:Destroy()
+                    for i, data in ipairs(placedBlocksList) do
+                        if data == currentlySelectedBlock then
+                            table.remove(placedBlocksList, i)
+                            break
+                        end
+                    end
+                    currentlySelectedBlock = nil
+                    deleteBtn.Visible = false
+                    refreshList()
+                end
+            end)
+
+            local function resetSelection()
+                selectedType = nil
+                wallBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+                floorBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+                pitchU.Visible = false
+                pitchD.Visible = false
+                yawL.Visible = false
+                yawR.Visible = false
+                rollL.Visible = false
+                rollR.Visible = false
+                confirmBtn.Visible = false
+                cancelBtn.Visible = false
+                rotX, rotY, rotZ = 0, 0, 0
+                if currentPreviewPart then
+                    currentPreviewPart:Destroy()
+                    currentPreviewPart = nil
+                end
+            end
+
             local function selectType(t)
                 selectedType = t
                 wallBtn.BackgroundColor3 = (t == "wall") and Color3.fromRGB(50, 180, 50) or Color3.fromRGB(50, 50, 50)
                 floorBtn.BackgroundColor3 = (t == "floor") and Color3.fromRGB(50, 180, 50) or Color3.fromRGB(50, 50, 50)
+                pitchU.Visible = true
+                pitchD.Visible = true
+                yawL.Visible = true
+                yawR.Visible = true
+                rollL.Visible = true
+                rollR.Visible = true
                 confirmBtn.Visible = true
                 cancelBtn.Visible = true
-            end
-            
-            wallBtn.MouseButton1Click:Connect(function() selectType("wall") end)
-            floorBtn.MouseButton1Click:Connect(function() selectType("floor") end)
-            
-            -- Подтверждение постройки
-            confirmBtn.MouseButton1Click:Connect(function()
-                if not selectedType then return end
-                local char = Player.Character
-                local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                if not hrp then return end
+                
+                if currentPreviewPart then currentPreviewPart:Destroy() end
                 
                 local p = Instance.new("Part")
                 p.Anchored = true
-                p.CanCollide = true
-                p.Material = Enum.Material.SmoothPlastic
-                p.Color = Color3.fromRGB(150, 150, 150)
+                p.CanCollide = false
+                p.Material = Enum.Material.ForceField
+                p.Color = Color3.fromRGB(50, 255, 50)
+                p.Transparency = 0.5
                 
                 if selectedType == "wall" then
                     p.Size = Vector3.new(blockSizeValue, blockSizeValue * 2, 1)
@@ -1933,30 +2130,97 @@ createToggle(movePage, "🏗️ Режим Стройки (Builder)", function(V
                     p.Size = Vector3.new(blockSizeValue, 1, blockSizeValue)
                 end
                 
-                -- Ставим блок в 10 стадах перед игроком
-                p.Position = hrp.Position + hrp.CFrame.LookVector * 10
-                p.Parent = workspace
+                local char = Player.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    p.Position = hrp.Position + hrp.CFrame.LookVector * 10
+                end
                 
-                -- Сброс после постройки
-                selectedType = nil
-                wallBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-                floorBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-                confirmBtn.Visible = false
-                cancelBtn.Visible = false
+                p.Parent = workspace
+                currentPreviewPart = p
+                rotX, rotY, rotZ = 0, 0, 0
+            end
+            
+            wallBtn.MouseButton1Click:Connect(function() selectType("wall") end)
+            floorBtn.MouseButton1Click:Connect(function() selectType("floor") end)
+            
+            -- Обработчики 3D-вращения
+            pitchU.MouseButton1Click:Connect(function() rotX = rotX + 15; updatePreviewPos(currentPreviewPart.Position) end)
+            pitchD.MouseButton1Click:Connect(function() rotX = rotX - 15; updatePreviewPos(currentPreviewPart.Position) end)
+            yawL.MouseButton1Click:Connect(function() rotY = rotY + 15; updatePreviewPos(currentPreviewPart.Position) end)
+            yawR.MouseButton1Click:Connect(function() rotY = rotY - 15; updatePreviewPos(currentPreviewPart.Position) end)
+            rollL.MouseButton1Click:Connect(function() rotZ = rotZ + 15; updatePreviewPos(currentPreviewPart.Position) end)
+            rollR.MouseButton1Click:Connect(function() rotZ = rotZ - 15; updatePreviewPos(currentPreviewPart.Position) end)
+
+            confirmBtn.MouseButton1Click:Connect(function()
+                if not currentPreviewPart then return end
+                
+                local placedBlock = Instance.new("Part")
+                placedBlock.Anchored = true
+                placedBlock.CanCollide = true
+                placedBlock.Material = Enum.Material.SmoothPlastic
+                placedBlock.Color = Color3.fromRGB(150, 150, 150)
+                placedBlock.Size = currentPreviewPart.Size
+                placedBlock.CFrame = currentPreviewPart.CFrame
+                placedBlock.Parent = workspace
+                
+                local bName = ""
+                if selectedType == "wall" then
+                    wallCount = wallCount + 1
+                    bName = "Стена " .. wallCount
+                else
+                    floorCount = floorCount + 1
+                    bName = "Пол " .. floorCount
+                end
+
+                table.insert(placedBlocksList, {Part = placedBlock, Name = bName})
+                refreshList()
+                resetSelection()
             end)
             
-            cancelBtn.MouseButton1Click:Connect(function()
-                selectedType = nil
-                wallBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-                floorBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-                confirmBtn.Visible = false
-                cancelBtn.Visible = false
+            cancelBtn.MouseButton1Click:Connect(function() resetSelection() end)
+
+            -- Логика перетаскивания пальцем
+            local UIS = game:GetService("UserInputService")
+            local lastMousePos = nil
+            
+            UIS.InputBegan:Connect(function(input, gameProcessed)
+                if gameProcessed or not builderModeEnabled or not selectedType then return end
+                if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    dragActive = true
+                    lastMousePos = Vector2.new(input.Position.X, input.Position.Y)
+                end
+            end)
+
+            UIS.InputChanged:Connect(function(input, gameProcessed)
+                if not dragActive or not builderModeEnabled or not currentPreviewPart then return end
+                if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
+                    local cam = workspace.CurrentCamera
+                    local unitRay = cam:ViewportPointToRay(input.Position.X, input.Position.Y)
+                    local rayParams = RaycastParams.new()
+                    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+                    rayParams.FilterDescendantsInstances = {currentPreviewPart, Player.Character, builderGui}
+                    
+                    local result = workspace:Raycast(unitRay.Origin, unitRay.Direction * 1000, rayParams)
+                    if result then
+                        local targetPos = result.Position + Vector3.new(0, currentPreviewPart.Size.Y / 2, 0)
+                        updatePreviewPos(targetPos)
+                    end
+                end
+            end)
+
+            UIS.InputEnded:Connect(function(input, gameProcessed)
+                if not dragActive or not builderModeEnabled then return end
+                if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    dragActive = false
+                end
             end)
         end
         builderGui.Visible = true
     else
         if builderGui then builderGui.Visible = false end
         if topNotif then topNotif.Visible = false end
+        if currentPreviewPart then currentPreviewPart:Destroy() currentPreviewPart = nil end
     end
 end)
 
@@ -2058,7 +2322,7 @@ createButton(movePage, "🧹 Удалить все поставленные пл
 end)
 
 -- 4. ВЕЧНЫЙ ДЕНЬ И УДАЛЕНИЕ ТУМАНА
-createToggle(movePage, "☀️ Включить Вечный День (Full Bright)", function(Value)
+createToggle(visualsPage, "☀️ Включить Вечный День (Full Bright)", function(Value)
     fullBrightEnabled = Value
     if fullBrightEnabled then
         task.spawn(function()
@@ -2080,7 +2344,7 @@ createToggle(movePage, "☀️ Включить Вечный День (Full Brig
     end
 end)
 
-createToggle(movePage, "🌫️ Полностью удалить туман (Remove Fog)", function(Value)
+createToggle(visualsPage, "🌫️ Полностью удалить туман (Remove Fog)", function(Value)
     removeFogEnabled = Value
     if removeFogEnabled then
         task.spawn(function()
@@ -2345,7 +2609,7 @@ createInput(visualsPage, "Размер хитбоксов врагов (Дефо
     end
 end)
 
-createToggle(visualsPage, "📦 Увеличить хитбоксы врагов (С подсветкой)", function(Value)
+createToggle(movePage, "📦 Увеличить хитбоксы врагов (С подсветкой)", function(Value)
     hitboxEnabled = Value
     
     -- Очистка при выключении
@@ -2406,7 +2670,7 @@ createToggle(visualsPage, "📦 Увеличить хитбоксы врагов
 end)
 
 -- вот тут находится конец 1 блока (части 7.2)
-createToggle(visualsPage, "🚀 Килл-Аура (Телепорт в Войд -20)", function(Value)
+createToggle(mainPage, "🚀 Килл-Аура (Телепорт в Войд -20)", function(Value)
     killAuraEnabled = Value
     if not killAuraEnabled then return end
 
@@ -2479,7 +2743,7 @@ local function findNearestEnemyToCenter()
     return bestPlr
 end
 
-createToggle(visualsPage, "🎯 Мини-кнопка Auto-Aim камеры (CamLock)", function(Value)
+createToggle(mainPage, "🎯 Мини-кнопка Auto-Aim камеры (CamLock)", function(Value)
     camLockMiniEnabled = Value
     camLockTarget = nil
     pcall(function() RunService:UnbindFromRenderStep("PromptCamLockStep") end)
@@ -3615,7 +3879,7 @@ local function applyInstantPrompt(prompt)
     end
 end
 
-createToggle(farmPage, "⚡ Мгновенное взаимодействие (Без удержания)", function(Value)
+createToggle(movePage, "⚡ Мгновенное взаимодействие (Без удержания)", function(Value)
     instantPromptEnabled = Value
     if instantPromptEnabled then
         for _, obj in ipairs(workspace:GetDescendants()) do
@@ -3721,7 +3985,7 @@ local function clearWorldMathBillboards()
     worldMathBillboards = {}
 end
 
-createToggle(farmPage, "🧮 Авто-решатель примеров (Экран + Мир)", function(Value)
+createToggle(vidualsPage, "🧮 Авто-решатель примеров (Экран + Мир)", function(Value)
     autoMathSolverEnabled = Value
     if mathOverlayBanner then
         pcall(function() mathOverlayBanner:Destroy() end)
