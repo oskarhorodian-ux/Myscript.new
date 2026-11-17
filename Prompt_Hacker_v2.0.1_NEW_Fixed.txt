@@ -3093,25 +3093,7 @@ createToggle(visualsPage, "⏱ Трекер КД над головой (Умны
                         local bp = plr:FindFirstChildOfClass("Backpack")
                         if bp then
                             for _, it in ipairs(bp:GetChildren()) do
-                                if it:IsA("Tool") then registerPlayerTool(pData, it) end
-                            end
-                        end
-                        renderPlayerCdSlots(head, pData, eq)
-                    end
-                end
-            end
-            task.wait(0.1) -- Сделал чуть быстрее для плавности таймера
-        end
-
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if plr.Character and plr.Character:FindFirstChild("Head") then
-                local gui = plr.Character.Head:FindFirstChild("PromptCDTracker")
-                if gui then gui:Destroy() end
-            end
-        end
-    end)
-end)
-
+                                if it:IsA("Tool") then registerPlayerTool(pDa
 createToggle(visualsPage, "⏱ Трекер КД над головой (Умные слоты 1–9)", function(Value)
     cdTrackerEnabled = Value
     if not cdTrackerEnabled then return end
