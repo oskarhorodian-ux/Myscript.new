@@ -3057,53 +3057,14 @@ end
 
 createToggle(visualsPage, "⏱ Трекер КД над головой (Умные слоты 1–9)", function(Value)
     cdTrackerEnabled = Value
-    
-    -- Очистка при выключении, чтобы не лагало
-    if not cdTrackerEnabled then
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if plr.Character and plr.Character:FindFirstChild("Head") then
-                local gui = plr.Character.Head:FindFirstChild("PromptCDTracker")
-                if gui then gui:Destroy() end
-            end
-        end
-        for _, pData in pairs(playerCooldownData) do
-            for _, conn in ipairs(pData.Connections) do conn:Disconnect() end
-        end
-        playerCooldownData = {}
-        return 
-    end
-
-    task.spawn(function()
-        while cdTrackerEnabled and not _G.ScriptDestroyed do
-            for _, plr in ipairs(Players:GetPlayers()) do
-                if plr ~= Player and plr.Character then
-                    local char = plr.Character
-                    local head = char:FindFirstChild("Head")
-                    local hum = char:FindFirstChildOfClass("Humanoid")
-                    if head and hum and hum.Health > 0 then
-                        local pData = playerCooldownData[plr]
-                        if not pData or pData.Char ~= char then
-                            if pData then
-                                for _, conn in ipairs(pData.Connections) do conn:Disconnect() end
-                            end
-                            pData = setupPlayerCdTracker(plr, char, hum)
-                        end
-                        local eq = char:FindFirstChildOfClass("Tool")
-                        if eq then registerPlayerTool(pData, eq) end
-                        local bp = plr:FindFirstChildOfClass("Backpack")
-                        if bp then
-                            for _, it in ipairs(bp:GetChildren()) do
-                                if it:IsA("Tool") then registerPlayerTool(pDa
-createToggle(visualsPage, "⏱ Трекер КД над головой (Умные слоты 1–9)", function(Value)
-    cdTrackerEnabled = Value
     if not cdTrackerEnabled then return end
 
     task.spawn(function()
         while cdTrackerEnabled and not _G.ScriptDestroyed do
-            for _, plr in ipairs(Players:GetPlayers()) do
-                if plr ~= Player and plr.Character then
-                    local char = plr.Character
-                    local head = char:FindFirstChild("Head")
+    for _, plr in ipais(Players:GetPlayers()) do
+               if plr ~= Player and plr.Character t
+                 local char = plr.Character
+          local head = char:FindFirstChild("Head")
                     local hum = char:FindFirstChildOfClass("Humanoid")
                     if head and hum and hum.Health > 0 then
                         local pData = playerCooldownData[plr]
