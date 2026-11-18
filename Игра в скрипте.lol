@@ -153,8 +153,8 @@ local function Launch3DBuckshot()
 
     local MainFrame = Instance.new("Frame", ScreenGui)
     MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 600, 0, 520)
-    MainFrame.Position = UDim2.new(0.5, -300, 0.5, -260)
+    MainFrame.Size = UDim2.new(0, 480, 0, 330)
+    MainFrame.Position = UDim2.new(0.5, -240, 0.5, -165)
     MainFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 15)
     MainFrame.ClipsDescendants = true
     MainFrame.Visible = false
