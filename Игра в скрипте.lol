@@ -560,7 +560,102 @@ local function Launch3DBuckshot()
 
     local UseItem, DealerTurn
 -- КОНЕЦ ЧАСТИ 3А
+-- НАЧАЛО ЧАСТИ 3Б
+    local function renderInventories()
+        for _, v in ipairs(PlayerInvFrame:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
+        for _, v in ipairs(DealerInvFrame:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
+
+        for i, itemName in ipairs(GameState.PlayerItems) do
+            local info = ITEMS_DB[itemName]
+            local btn = Instance.new("TextButton", PlayerInvFrame)
+            btn.Size = UDim2.new(0, 72, 0, 44)
+            btn.BackgroundColor3 = Color3.fromRGB(36, 44, 38)
+            btn.Text = info.Icon .. "\n" .. info.Short
+            btn.TextColor3 = Color3.new(1,1,1)
+            btn.Font = Enum.Font.Code
+            btn.TextSize = 11
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
+
+            btn.MouseEnter:Connect(function() TooltipLabel.Text = "[" .. info.Short .. "]: " .. info.Desc end)
+            btn.MouseButton1Click:Connect(function()
+                if GameState.Turn == "Player" and not GameState.GameOver and not GameState.StealingMode and not GameState.Busy then
+                    table.remove(GameState.PlayerItems, i)
+                    UseItem("Player", itemName)
+                end
+            end)
+        end
+
+        for i, itemName in ipairs(GameState.DealerItems) do
+            local info = ITEMS_DB[itemName]
+            local btn = Instance.new("TextButton", DealerInvFrame)
+            btn.Size = UDim2.new(0, 72, 0, 34)
+            btn.BackgroundColor3 = GameState.StealingMode and Color3.fromRGB(185, 140, 20) or Color3.fromRGB(40, 26, 28)
+            btn.Text = info.Icon .. " " .. info.Short
+            btn.TextColor3 = Color3.new(1,1,1)
+            btn.Font = Enum.Font.Code
+            btn.TextSize = 10
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+
+            btn.MouseEnter:Connect(function() TooltipLabel.Text = "[Дилер - " .. info.Short .. "]: " .. info.Desc end)
+            btn.MouseButton1Click:Connect(function()
+                if GameState.StealingMode and GameState.Turn == "Player" and not GameState.Busy then
+                    if itemName == "Adrenaline" then
+                        setLog("Нельзя украсть Адреналин!", Color3.fromRGB(255, 90, 90))
+                        return
+                    end
+                    GameState.StealingMode = false
+                    table.remove(GameState.DealerItems, i)
+                    setLog("💉 УКРАДЕН ПРЕДМЕТ: " .. info.Short .. "!", Color3.fromRGB(255, 220, 80))
+                    task.wait(0.5)
+                    UseItem("Player", itemName)
+                end
+            end)
+        end
+    end
+
+    local function giveFairItems(count)
+        local pSpace = 4 - #GameState.PlayerItems
+        local dSpace = 4 - #GameState.DealerItems
+        local actualGive = math.min(count, pSpace, dSpace)
+
+        for _ = 1, actualGive do
+            table.insert(GameState.PlayerItems, ITEM_NAMES[math.random(1, #ITEM_NAMES)])
+            table.insert(GameState.DealerItems, ITEM_NAMES[math.random(1, #ITEM_NAMES)])
+        end
+        return actualGive
+    end
+
+    local function loadShotgun()
+        playSFX(SOUNDS.Rack, 1.0)
+        GameState.Shells = {}
+        GameState.SawActive = false
+        local total = math.random(3, 8)
+        local liveCount = math.clamp(math.floor(total / 2) + math.random(0, 1), 1, total - 1)
+        local blankCount = total - liveCount
+
+        for _ = 1, liveCount do table.insert(GameState.Shells, true) end
+        for _ = 1, blankCount do table.insert(GameState.Shells, false) end
+
+        for i = #GameState.Shells, 2, -1 do
+            local j = math.random(1, i)
+            GameState.Shells[i], GameState.Shells[j] = GameState.Shells[j], GameState.Shells[i]
+        end
+
+        local given = giveFairItems(math.random(2, 4))
+
+        GunRoot.CFrame = CFrame.new(0, 0.35, 0) * CFrame.Angles(0, math.rad(90), 0)
+        DealerFace.Text = "[ 👁️ _ 👁️ ]"
+        renderInventories()
+        updateHPUI()
+        setLog(
+            string.format("🔄 ОБОЙМА: 🔴 %d БОЕВЫХ  |  🔵 %d ХОЛОСТЫХ", liveCount, blankCount),
+            Color3.fromRGB(255, 215, 90),
+            string.format("Раунд %d/3. Выдано по %d предмета (лимит 4). Твой ход!", GameState.Round, given)
+        )
+    end
+-- КОНЕЦ ЧАСТИ 3Б
 -- НАЧАЛО ЧАСТИ 3В
+local loadShotgun
     local function startNewGame()
         GameState.Round = 1
         GameState.MaxHP = math.random(3, 5)
