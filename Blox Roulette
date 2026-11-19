@@ -123,7 +123,6 @@ TriggerBtn.TextColor3 = Color3.new(1, 1, 1)
 TriggerBtn.Font = Enum.Font.Code
 TriggerBtn.TextSize = 12
 Instance.new("UICorner", TriggerBtn).CornerRadius = UDim.new(0, 6)
-
 local function Launch3DBuckshot()
     if ScreenGui:FindFirstChild("MainFrame") or ScreenGui:FindFirstChild("IntroOrb") then return end
 
@@ -135,16 +134,42 @@ local function Launch3DBuckshot()
         StealingMode = false, GameOver = false, Busy = false
     }
 
+    -- 1. АНИМАЦИЯ МОЛНИИ (ВОЗВРАЩЕНИЕ)
+    local IntroOrb = Instance.new("Frame", ScreenGui)
+    IntroOrb.Name = "IntroOrb"
+    IntroOrb.Size = UDim2.new(0, 56, 0, 56)
+    IntroOrb.Position = UDim2.new(0.5, -28, 0, -70)
+    IntroOrb.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+    IntroOrb.ZIndex = 100
+    Instance.new("UICorner", IntroOrb).CornerRadius = UDim.new(1, 0)
+    local orbStroke = Instance.new("UIStroke", IntroOrb)
+    orbStroke.Color = Color3.fromRGB(255, 200, 50)
+    orbStroke.Thickness = 2
+
+    local BoltLabel = Instance.new("TextLabel", IntroOrb)
+    BoltLabel.Size = UDim2.new(1, 0, 1, 0)
+    BoltLabel.BackgroundTransparency = 1
+    BoltLabel.Text = "⚡"
+    BoltLabel.TextColor3 = Color3.fromRGB(255, 225, 65)
+    BoltLabel.Font = Enum.Font.Code
+    BoltLabel.TextSize = 28
+    BoltLabel.ZIndex = 101
+
+    -- 2. ГЛАВНОЕ ОКНО
     local MainFrame = Instance.new("Frame", ScreenGui)
     MainFrame.Name = "MainFrame"
     MainFrame.Size = UDim2.new(0, 520, 0, 380)
     MainFrame.Position = UDim2.new(0.5, -260, 0.5, -190)
     MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
     MainFrame.ClipsDescendants = true
+    MainFrame.Visible = false
     Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
     local MainStroke = Instance.new("UIStroke", MainFrame)
     MainStroke.Color = Color3.fromRGB(120, 25, 25)
     MainStroke.Thickness = 2
+    
+    local WinScale = Instance.new("UIScale", MainFrame)
+    WinScale.Scale = 0.01
 
     local TopBar = Instance.new("Frame", MainFrame)
     TopBar.Size = UDim2.new(1, 0, 0, 36)
@@ -176,6 +201,7 @@ local function Launch3DBuckshot()
     Content.Position = UDim2.new(0, 10, 0, 40)
     Content.BackgroundTransparency = 1
 
+    -- СТАТУС БАР
     local StatusBar = Instance.new("Frame", Content)
     StatusBar.Size = UDim2.new(1, 0, 0, 40)
     StatusBar.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
@@ -199,8 +225,9 @@ local function Launch3DBuckshot()
     PlayerHPLabel.TextSize = 16
     PlayerHPLabel.TextXAlignment = Enum.TextXAlignment.Right
 
+    -- 3D СЦЕНА
     local Viewport = Instance.new("ViewportFrame", Content)
-    Viewport.Size = UDim2.new(1, 0, 0, 130)
+    Viewport.Size = UDim2.new(1, 0, 0, 200) -- Сделал сцену больше, чтобы влезли предметы
     Viewport.Position = UDim2.new(0, 0, 0, 46)
     Viewport.BackgroundColor3 = Color3.fromRGB(5, 5, 6)
     Viewport.Ambient = Color3.fromRGB(100, 100, 110)
@@ -211,9 +238,10 @@ local function Launch3DBuckshot()
 
     local WorldModel = Instance.new("WorldModel", Viewport)
     local Camera = Instance.new("Camera", Viewport)
-    Camera.CFrame = CFrame.new(Vector3.new(0, 3.5, 6), Vector3.new(0, 0, -1))
+    Camera.CFrame = CFrame.new(Vector3.new(0, 3, 6.5), Vector3.new(0, 2, -2))
     Viewport.CurrentCamera = Camera
 
+    -- Стол
     local TableTop = Instance.new("Part", WorldModel)
     TableTop.Size = Vector3.new(12, 0.4, 8)
     TableTop.Position = Vector3.new(0, -0.2, 0)
@@ -221,41 +249,64 @@ local function Launch3DBuckshot()
     TableTop.Color = Color3.fromRGB(24, 52, 34)
     TableTop.Material = Enum.Material.SmoothPlastic
 
+    -- ЖУТКИЙ ДИЛЕР
     local DealerModel = Instance.new("Model", WorldModel)
-    DealerModel.Name = "Dealer"
     local dHead = Instance.new("Part", DealerModel)
-    dHead.Size = Vector3.new(1.8, 2.2, 1.2)
-    dHead.Position = Vector3.new(-3.5, 0.8, -2)
+    dHead.Size = Vector3.new(2.2, 2.6, 2.2)
+    dHead.Position = Vector3.new(0, 2.2, -3.5)
     dHead.Anchored = true
-    dHead.Color = Color3.fromRGB(40, 40, 40)
-    dHead.Material = Enum.Material.Metal
-
-    local dMask = Instance.new("Part", DealerModel)
-    dMask.Size = Vector3.new(1.5, 0.8, 0.2)
-    dMask.Position = Vector3.new(-3.5, 1, -1.3)
-    dMask.Anchored = true
-    dMask.Color = Color3.fromRGB(240, 240, 240)
-    dMask.Material = Enum.Material.SmoothPlastic
+    dHead.Color = Color3.fromRGB(210, 215, 200)
+    dHead.Material = Enum.Material.SmoothPlastic
+    dHead.Shape = Enum.PartType.Ball
 
     local dEyeL = Instance.new("Part", DealerModel)
-    dEyeL.Size = Vector3.new(0.3, 0.3, 0.2)
-    dEyeL.Position = Vector3.new(-4.0, 1.1, -1.15)
+    dEyeL.Size = Vector3.new(0.5, 0.7, 0.5)
+    dEyeL.Position = Vector3.new(-0.5, 2.3, -2.45)
     dEyeL.Anchored = true
-    dEyeL.Color = Color3.fromRGB(0, 0, 0)
+    dEyeL.Color = Color3.fromRGB(5, 5, 5)
+    dEyeL.Material = Enum.Material.Neon
 
     local dEyeR = Instance.new("Part", DealerModel)
-    dEyeR.Size = Vector3.new(0.3, 0.3, 0.2)
-    dEyeR.Position = Vector3.new(-3.0, 1.1, -1.15)
+    dEyeR.Size = Vector3.new(0.5, 0.7, 0.5)
+    dEyeR.Position = Vector3.new(0.5, 2.3, -2.45)
     dEyeR.Anchored = true
-    dEyeR.Color = Color3.fromRGB(0, 0, 0)
+    dEyeR.Color = Color3.fromRGB(5, 5, 5)
+    dEyeR.Material = Enum.Material.Neon
 
+    local dMouth = Instance.new("Part", DealerModel)
+    dMouth.Size = Vector3.new(1.1, 0.15, 0.2)
+    dMouth.Position = Vector3.new(0, 1.8, -2.45)
+    dMouth.Anchored = true
+    dMouth.Color = Color3.fromRGB(5, 5, 5)
+    dMouth.Material = Enum.Material.SmoothPlastic
+
+    local dBody = Instance.new("Part", DealerModel)
+    dBody.Size = Vector3.new(2.5, 4, 1.5)
+    dBody.Position = Vector3.new(0, -0.5, -3.8)
+    dBody.Anchored = true
+    dBody.Color = Color3.fromRGB(15, 15, 18)
+    dBody.Material = Enum.Material.SmoothPlastic
+
+    -- Свет
+    local TableLightPart = Instance.new("Part", WorldModel)
+    TableLightPart.Size = Vector3.new(1, 1, 1)
+    TableLightPart.Position = Vector3.new(0, 6, 0)
+    TableLightPart.Anchored = true
+    TableLightPart.Transparency = 1
+    local spotLight = Instance.new("SpotLight", TableLightPart)
+    spotLight.Brightness = 2.5
+    spotLight.Range = 20
+    spotLight.Angle = 90
+    spotLight.Face = Enum.NormalId.Bottom
+
+    -- Дробовик
     local GunRoot = Instance.new("Part", WorldModel)
     GunRoot.Size = Vector3.new(0.2, 0.2, 0.2)
     GunRoot.Transparency = 1
     GunRoot.Anchored = true
     GunRoot.CFrame = CFrame.new(0, 0.35, 0)
 
-    local function makeGunPart(size, offset, color)
+    local function makeGunPart(size, color)
         local p = Instance.new("Part", WorldModel)
         p.Size = size
         p.Color = color
@@ -264,11 +315,11 @@ local function Launch3DBuckshot()
         return p
     end
 
-    local Stock = makeGunPart(Vector3.new(0.26, 0.36, 1.1), Vector3.new(0, -0.05, 1.1), Color3.fromRGB(95, 50, 25))
-    local Receiver = makeGunPart(Vector3.new(0.3, 0.32, 0.9), Vector3.new(0, 0.05, 0.2), Color3.fromRGB(35, 35, 40))
-    local Pump = makeGunPart(Vector3.new(0.32, 0.26, 0.8), Vector3.new(0, -0.04, -0.7), Color3.fromRGB(85, 45, 20))
-    local BarrelBase = makeGunPart(Vector3.new(0.22, 0.22, 1.3), Vector3.new(0, 0.1, -0.8), Color3.fromRGB(55, 55, 62))
-    local BarrelTip = makeGunPart(Vector3.new(0.21, 0.21, 0.8), Vector3.new(0, 0.1, -1.8), Color3.fromRGB(55, 55, 62))
+    local Stock = makeGunPart(Vector3.new(0.26, 0.36, 1.1), Color3.fromRGB(95, 50, 25))
+    local Receiver = makeGunPart(Vector3.new(0.3, 0.32, 0.9), Color3.fromRGB(35, 35, 40))
+    local Pump = makeGunPart(Vector3.new(0.32, 0.26, 0.8), Color3.fromRGB(85, 45, 20))
+    local BarrelBase = makeGunPart(Vector3.new(0.22, 0.22, 1.3), Color3.fromRGB(55, 55, 62))
+    local BarrelTip = makeGunPart(Vector3.new(0.21, 0.21, 0.8), Color3.fromRGB(55, 55, 62))
 
     local function syncGunParts()
         Stock.CFrame = GunRoot.CFrame * CFrame.new(0, -0.05, 1.1)
@@ -279,141 +330,179 @@ local function Launch3DBuckshot()
         BarrelTip.Transparency = GameState.SawActive and 1 or 0
     end
     syncGunParts()
-local DealerInvFrame = Instance.new("Frame", Content)
-DealerInvFrame.Size = UDim2.new(1, 0, 0, 36)
-DealerInvFrame.Position = UDim2.new(0, 0, 0, 182)
-DealerInvFrame.BackgroundColor3 = Color3.fromRGB(24, 18, 20)
-Instance.new("UICorner", DealerInvFrame).CornerRadius = UDim.new(0, 6)
-local DLayout = Instance.new("UIListLayout", DealerInvFrame)
-DLayout.FillDirection = Enum.FillDirection.Horizontal
-DLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-DLayout.Padding = UDim.new(0, 8)
-DLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 
-local PlayerInvFrame = Instance.new("Frame", Content)
-PlayerInvFrame.Size = UDim2.new(1, 0, 0, 50)
-PlayerInvFrame.Position = UDim2.new(0, 0, 0, 224)
-PlayerInvFrame.BackgroundColor3 = Color3.fromRGB(18, 24, 20)
-Instance.new("UICorner", PlayerInvFrame).CornerRadius = UDim.new(0, 6)
-local PLayout = Instance.new("UIListLayout", PlayerInvFrame)
-PLayout.FillDirection = Enum.FillDirection.Horizontal
-PLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-PLayout.Padding = UDim.new(0, 8)
-PLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+    -- КНОПКИ СТРЕЛЬБЫ
+    local ShootDealerBtn = Instance.new("TextButton", Content)
+    ShootDealerBtn.Size = UDim2.new(0.48, 0, 0, 48)
+    ShootDealerBtn.Position = UDim2.new(0, 0, 0, 260)
+    ShootDealerBtn.BackgroundColor3 = Color3.fromRGB(165, 35, 35)
+    ShootDealerBtn.Text = "🔫 ВЫСТРЕЛИТЬ В ДИЛЕРА"
+    ShootDealerBtn.TextColor3 = Color3.new(1, 1, 1)
+    ShootDealerBtn.Font = Enum.Font.Code
+    ShootDealerBtn.TextSize = 14
+    Instance.new("UICorner", ShootDealerBtn).CornerRadius = UDim.new(0, 6)
 
-local ShootDealerBtn = Instance.new("TextButton", Content)
-ShootDealerBtn.Size = UDim2.new(0.48, 0, 0, 48)
-ShootDealerBtn.Position = UDim2.new(0, 0, 0, 280)
-ShootDealerBtn.BackgroundColor3 = Color3.fromRGB(165, 35, 35)
-ShootDealerBtn.Text = "🔫 ВЫСТРЕЛИТЬ В ДИЛЕРА"
-ShootDealerBtn.TextColor3 = Color3.new(1, 1, 1)
-ShootDealerBtn.Font = Enum.Font.Code
-ShootDealerBtn.TextSize = 14
-Instance.new("UICorner", ShootDealerBtn).CornerRadius = UDim.new(0, 6)
+    local ShootSelfBtn = Instance.new("TextButton", Content)
+    ShootSelfBtn.Size = UDim2.new(0.48, 0, 0, 48)
+    ShootSelfBtn.Position = UDim2.new(0.52, 0, 0, 260)
+    ShootSelfBtn.BackgroundColor3 = Color3.fromRGB(40, 95, 160)
+    ShootSelfBtn.Text = "🔫 ВЫСТРЕЛИТЬ В СЕБЯ"
+    ShootSelfBtn.TextColor3 = Color3.new(1, 1, 1)
+    ShootSelfBtn.Font = Enum.Font.Code
+    ShootSelfBtn.TextSize = 14
+    Instance.new("UICorner", ShootSelfBtn).CornerRadius = UDim.new(0, 6)
 
-local ShootSelfBtn = Instance.new("TextButton", Content)
-ShootSelfBtn.Size = UDim2.new(0.48, 0, 0, 48)
-ShootSelfBtn.Position = UDim2.new(0.52, 0, 0, 280)
-ShootSelfBtn.BackgroundColor3 = Color3.fromRGB(40, 95, 160)
-ShootSelfBtn.Text = "🔫 ВЫСТРЕЛИТЬ В СЕБЯ"
-ShootSelfBtn.TextColor3 = Color3.new(1, 1, 1)
-ShootSelfBtn.Font = Enum.Font.Code
-ShootSelfBtn.TextSize = 14
-Instance.new("UICorner", ShootSelfBtn).CornerRadius = UDim.new(0, 6)
+    local LogLabel = Instance.new("TextLabel", Content)
+    LogLabel.Size = UDim2.new(1, 0, 0, 20)
+    LogLabel.Position = UDim2.new(0, 0, 0, 320)
+    LogLabel.BackgroundTransparency = 1
+    LogLabel.Text = "Игра началась..."
+    LogLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    LogLabel.Font = Enum.Font.Code
+    LogLabel.TextSize = 12
 
-local LogLabel = Instance.new("TextLabel", Content)
-LogLabel.Size = UDim2.new(1, 0, 0, 20)
-LogLabel.Position = UDim2.new(0, 0, 0, 334)
-LogLabel.BackgroundTransparency = 1
-LogLabel.Text = "Игра началась..."
-LogLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-LogLabel.Font = Enum.Font.Code
-LogLabel.TextSize = 12
-
-local TableItems = {}
-local function render3DItems()
-    for _, item in pairs(TableItems) do if item and item.Parent then item:Destroy() end end
-    TableItems = {}
-    for i, itemName in ipairs(GameState.PlayerItems) do
-        local p = Instance.new("Part", WorldModel)
-        p.Size = Vector3.new(0.5, 0.5, 0.5)
-        p.Position = Vector3.new(2 + (i * 0.6), 0.25, 1.5)
-        p.Anchored = true
-        p.Material = Enum.Material.Neon
-        p.Color = Color3.fromRGB(50, 255, 100)
-        p.Name = itemName
-        table.insert(TableItems, p)
-    end
-    for i, itemName in ipairs(GameState.DealerItems) do
-        local p = Instance.new("Part", WorldModel)
-        p.Size = Vector3.new(0.5, 0.5, 0.5)
-        p.Position = Vector3.new(-3.5 + (i * 0.6), 0.25, -0.5)
-        p.Anchored = true
-        p.Material = Enum.Material.Neon
-        p.Color = Color3.fromRGB(255, 50, 50)
-        p.Name = itemName
-        table.insert(TableItems, p)
-    end
-end
-
-local function renderInventories()
-    for _, v in ipairs(PlayerInvFrame:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
-    for _, v in ipairs(DealerInvFrame:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
-
-    for i, itemName in ipairs(GameState.PlayerItems) do
-        local info = ITEMS_DB[itemName]
-        local btn = Instance.new("TextButton", PlayerInvFrame)
-        btn.Size = UDim2.new(0, 72, 0, 44)
-        btn.BackgroundColor3 = Color3.fromRGB(36, 44, 38)
-        btn.Text = info.Icon .. "\n" .. info.Short
-        btn.TextColor3 = Color3.new(1,1,1)
-        btn.Font = Enum.Font.Code
-        btn.TextSize = 11
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
-        btn.MouseButton1Click:Connect(function()
-            if GameState.Turn == "Player" and not GameState.GameOver and not GameState.StealingMode and not GameState.Busy then
-                GameState.Busy = true
-                table.remove(GameState.PlayerItems, i)
-                renderInventories()
-                render3DItems()
-                UseItem("Player", itemName)
-                GameState.Busy = false
-            end
-        end)
+    -- ИНТЕРАКТИВНЫЕ 3D-ПРЕДМЕТЫ
+    local TableItems = {}
+    local ClickButtons = {}
+    
+    local function clearItems()
+        for _, item in pairs(TableItems) do if item then item:Destroy() end end
+        for _, btn in pairs(ClickButtons) do if btn then btn:Destroy() end end
+        TableItems = {}
+        ClickButtons = {}
     end
 
-    for i, itemName in ipairs(GameState.DealerItems) do
-        local info = ITEMS_DB[itemName]
-        local btn = Instance.new("TextButton", DealerInvFrame)
-        btn.Size = UDim2.new(0, 72, 0, 34)
-        btn.BackgroundColor3 = GameState.StealingMode and Color3.fromRGB(185, 140, 20) or Color3.fromRGB(40, 26, 28)
-        btn.Text = info.Icon .. " " .. info.Short
-        btn.TextColor3 = Color3.new(1,1,1)
-        btn.Font = Enum.Font.Code
-        btn.TextSize = 10
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
-        btn.MouseButton1Click:Connect(function()
-            if GameState.StealingMode and GameState.Turn == "Player" and not GameState.Busy then
-                GameState.StealingMode = false
-                GameState.Busy = true
-                table.remove(GameState.DealerItems, i)
-                renderInventories()
-                render3DItems()
-                UseItem("Player", itemName)
-                GameState.Busy = false
-            end
-        end)
+    local function createItemModel(itemName, pos, colorBase, isDealer)
+        local model = Instance.new("Model", WorldModel)
+        
+        local base = Instance.new("Part", model)
+        base.Size = Vector3.new(0.4, 0.4, 0.4)
+        base.Position = pos
+        base.Anchored = true
+        base.Color = colorBase
+        base.Material = Enum.Material.SmoothPlastic
+        
+        if itemName == "Beer" then
+            base.Size = Vector3.new(0.4, 1, 0.4)
+            base.Color = Color3.fromRGB(139, 69, 19)
+        elseif itemName == "Cigarettes" then
+            base.Size = Vector3.new(0.8, 0.1, 0.1)
+            base.Color = Color3.fromRGB(255, 255, 255)
+            local tip = Instance.new("Part", model)
+            tip.Size = Vector3.new(0.2, 0.11, 0.11)
+            tip.Position = pos + Vector3.new(0.4, 0, 0)
+            tip.Anchored = true
+            tip.Color = Color3.fromRGB(255, 100, 0)
+            table.insert(TableItems, tip)
+        elseif itemName == "Magnifying Glass" then
+            base.Shape = Enum.PartType.Cylinder
+            base.Size = Vector3.new(0.1, 0.6, 0.6)
+            base.Color = Color3.fromRGB(200, 200, 200)
+            base.CFrame = CFrame.new(pos) * CFrame.Angles(0, 0, math.rad(90))
+        elseif itemName == "Handsaw" then
+            base.Size = Vector3.new(1.2, 0.4, 0.1)
+            base.Color = Color3.fromRGB(150, 150, 150)
+        elseif itemName == "Expired Medicine" then
+            base.Shape = Enum.PartType.Cylinder
+            base.Size = Vector3.new(0.5, 0.4, 0.4)
+            base.Color = Color3.fromRGB(255, 255, 255)
+        elseif itemName == "Burner Phone" then
+            base.Size = Vector3.new(0.3, 0.6, 0.1)
+            base.Color = Color3.fromRGB(30, 30, 30)
+        elseif itemName == "Inverter" then
+            base.Size = Vector3.new(0.5, 0.3, 0.3)
+            base.Color = Color3.fromRGB(200, 50, 200)
+        elseif itemName == "Handcuffs" then
+            base.Shape = Enum.PartType.Cylinder
+            base.Size = Vector3.new(0.2, 0.6, 0.6)
+            base.Color = Color3.fromRGB(180, 180, 180)
+            base.CFrame = CFrame.new(pos) * CFrame.Angles(0, math.rad(90), 0)
+        else
+            base.Shape = Enum.PartType.Ball
+        end
+        
+        table.insert(TableItems, model)
+        
+        -- Создаем невидимую кнопку ПОВЕРХ 3D-предмета
+        local screenPos, onScreen = Camera:WorldToViewportPoint(pos)
+        if onScreen then
+            local clickBtn = Instance.new("TextButton", Viewport)
+            clickBtn.Size = UDim2.new(0, 50, 0, 50) -- Размер кнопки
+            clickBtn.AnchorPoint = Vector2.new(0.5, 0.5)
+            -- Переводим 3D координаты в 2D экранные
+            clickBtn.Position = UDim2.new(0, screenPos.X, 0, screenPos.Y)
+            clickBtn.BackgroundTransparency = 1
+            clickBtn.Text = ""
+            clickBtn.ZIndex = 10
+            
+            -- Наводим на предмет - подсвечиваем
+            clickBtn.MouseEnter:Connect(function() base.Material = Enum.Material.Neon end)
+            clickBtn.MouseLeave:Connect(function() base.Material = Enum.Material.SmoothPlastic end)
+            
+            -- Нажатие на предмет
+            clickBtn.MouseButton1Click:Connect(function()
+                if isDealer then
+                    -- Если это предмет дилера, и мы в режиме кражи
+                    if GameState.StealingMode and GameState.Turn == "Player" and not GameState.Busy then
+                        GameState.StealingMode = false
+                        GameState.Busy = true
+                        for i, n in ipairs(GameState.DealerItems) do
+                            if n == itemName then
+                                table.remove(GameState.DealerItems, i)
+                                break
+                            end
+                        end
+                        clearItems()
+                        render3DItems()
+                        UseItem("Player", itemName)
+                        GameState.Busy = false
+                    end
+                else
+                    -- Если это предмет игрока
+                    if GameState.Turn == "Player" and not GameState.StealingMode and not GameState.Busy then
+                        GameState.Busy = true
+                        for i, n in ipairs(GameState.PlayerItems) do
+                            if n == itemName then
+                                table.remove(GameState.PlayerItems, i)
+                                break
+                            end
+                        end
+                        clearItems()
+                        render3DItems()
+                        UseItem("Player", itemName)
+                        GameState.Busy = false
+                    end
+                end
+            end)
+            
+            table.insert(ClickButtons, clickBtn)
+        end
     end
-    render3DItems()
-end
 
-local function updateHPUI()
-    DealerHPLabel.Text = "DEALER: " .. string.rep("⚡", math.max(0, GameState.DealerHP))
-    PlayerHPLabel.Text = "YOU: " .. string.rep("⚡", math.max(0, GameState.PlayerHP))
-end
+    local function render3DItems()
+        clearItems()
+        
+        -- Твои предметы (зеленые/желтые)
+        for i, itemName in ipairs(GameState.PlayerItems) do
+            local pos = Vector3.new(1.5 + (i * 0.8), 0.4, 2)
+            createItemModel(itemName, pos, Color3.fromRGB(50, 255, 100), false)
+        end
+        
+        -- Предметы дилера (красные, но если идет кража - золотые)
+        local dealerColor = GameState.StealingMode and Color3.fromRGB(255, 215, 0) or Color3.fromRGB(255, 50, 50)
+        for i, itemName in ipairs(GameState.DealerItems) do
+            local pos = Vector3.new(-3.5 + (i * 0.8), 0.4, -1)
+            createItemModel(itemName, pos, dealerColor, true)
+        end
+    end
 
-local UseItem, DealerTurn
-    local function animate3DGun(targetType, isLive)
+    local function updateHPUI()
+        DealerHPLabel.Text = "DEALER: " .. string.rep("⚡", math.max(0, GameState.DealerHP))
+        PlayerHPLabel.Text = "YOU: " .. string.rep("⚡", math.max(0, GameState.PlayerHP))
+    end
+
+    local UseItem, DealerTurn
+local function animate3DGun(targetType, isLive)
         local targetCF
         if targetType == "Dealer" then
             targetCF = CFrame.new(-2.5, 0.8, -1) * CFrame.Angles(math.rad(10), math.rad(-45), 0)
