@@ -1,0 +1,2284 @@
+-- НАЧАЛО ЧАСТИ 1А
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+
+local player = Players.LocalPlayer
+local parentGui = (gethui and gethui()) or CoreGui or player:WaitForChild("PlayerGui")
+
+if parentGui:FindFirstChild("BloxRoulette3D") then
+    parentGui.BloxRoulette3D:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "BloxRoulette3D"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = parentGui
+
+local SOUNDS = {
+    Shot = "rbxassetid://168143115",
+    Blank = "rbxassetid://142082166",
+    Rack = "rbxassetid://168143162",
+    Saw = "rbxassetid://131072992",
+    Heal = "rbxassetid://4612375233",
+    Zap = "rbxassetid://4612375233", -- звук разряда после удара (поменяй ID на свой, если хочешь другой)
+    Win = "rbxassetid://9114021242" -- 8-Bit Retro Win (в духе DOORS Thank You)
+}
+
+-- >>> МУЗЫКА <<<  Вставь сюда ID трека "General Release" (Mike Klubnika), например "rbxassetid://123456789".
+-- Экран трясётся в такт реальной громкости этого звука. Пока ID пустой - музыки и тряски от неё нет.
+local MUSIC_ID = ""
+local MUSIC_VOLUME = 0.55
+local MUSIC_SHAKE = 1.0 -- 1 = слегка, 2 = сильнее, 0 = выключить тряску
+
+local function playSFX(soundId, pitch)
+    task.spawn(function()
+        pcall(function()
+            local s = Instance.new("Sound", ScreenGui)
+            s.SoundId = soundId
+            s.Volume = 0.85
+            s.PlaybackSpeed = pitch or 1
+            s:Play()
+            s.Ended:Connect(function() s:Destroy() end)
+            task.delay(3, function() if s then s:Destroy() end end)
+        end)
+    end)
+end
+-- КОНЕЦ ЧАСТИ 1А
+-- НАЧАЛО ЧАСТИ 1Б
+local function makeDraggable(obj, handle)
+    local dragging, dragStart, startPos
+    handle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging, dragStart, startPos = true, input.Position, obj.Position
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            obj.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+end
+
+local MiniLauncher = Instance.new("Frame", ScreenGui)
+MiniLauncher.Name = "PromtHackerLauncher"
+MiniLauncher.Size = UDim2.new(0, 230, 0, 82)
+MiniLauncher.Position = UDim2.new(0, 20, 0.5, -41)
+MiniLauncher.BackgroundColor3 = Color3.fromRGB(14, 14, 18)
+Instance.new("UICorner", MiniLauncher).CornerRadius = UDim.new(0, 8)
+local lStroke = Instance.new("UIStroke", MiniLauncher)
+lStroke.Color = Color3.fromRGB(180, 35, 35)
+lStroke.Thickness = 1.6
+makeDraggable(MiniLauncher, MiniLauncher)
+
+local LHeader = Instance.new("TextLabel", MiniLauncher)
+LHeader.Size = UDim2.new(1, -35, 0, 22)
+LHeader.Position = UDim2.new(0, 8, 0, 4)
+LHeader.BackgroundTransparency = 1
+LHeader.Text = "⚡ PROMT_HACKER // MODULE"
+LHeader.TextColor3 = Color3.fromRGB(150, 150, 165)
+LHeader.Font = Enum.Font.Code
+LHeader.TextSize = 11
+LHeader.TextXAlignment = Enum.TextXAlignment.Left
+
+local UnloadBtn = Instance.new("TextButton", MiniLauncher)
+UnloadBtn.Size = UDim2.new(0, 20, 0, 20)
+UnloadBtn.Position = UDim2.new(1, -24, 0, 4)
+UnloadBtn.BackgroundColor3 = Color3.fromRGB(45, 25, 25)
+UnloadBtn.Text = "X"
+UnloadBtn.TextColor3 = Color3.fromRGB(255, 90, 90)
+UnloadBtn.Font = Enum.Font.Code
+UnloadBtn.TextSize = 11
+Instance.new("UICorner", UnloadBtn).CornerRadius = UDim.new(0, 4)
+UnloadBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+
+local TriggerBtn = Instance.new("TextButton", MiniLauncher)
+TriggerBtn.Size = UDim2.new(1, -16, 0, 44)
+TriggerBtn.Position = UDim2.new(0, 8, 0, 30)
+TriggerBtn.BackgroundColor3 = Color3.fromRGB(155, 30, 30)
+TriggerBtn.Text = "🎲 BLOX ROULETTE.3D\n[ НАЖМИ ДЛЯ ЗАПУСКА ]"
+TriggerBtn.TextColor3 = Color3.new(1, 1, 1)
+TriggerBtn.Font = Enum.Font.Code
+TriggerBtn.TextSize = 12
+Instance.new("UICorner", TriggerBtn).CornerRadius = UDim.new(0, 6)
+-- КОНЕЦ ЧАСТИ 1Б
+-- НАЧАЛО ЧАСТИ 1В
+local ITEMS_DB = {
+    ["Magnifying Glass"] = {Icon = "🔍", Short = "Лупа", Desc = "Показывает, какой патрон сейчас в стволе (боевой или холостой)"},
+    ["Beer"] = {Icon = "🍺", Short = "Пиво", Desc = "Выбрасывает текущий патрон, ты видишь какой. Ход не теряется"},
+    ["Handsaw"] = {Icon = "🪚", Short = "Ножовка", Desc = "Следующий выстрел наносит 2 урона. Действует на один выстрел"},
+    ["Handcuffs"] = {Icon = "⛓️", Short = "Наручники", Desc = "Соперник пропускает свой следующий ход"},
+    ["Cigarettes"] = {Icon = "🚬", Short = "Сигареты", Desc = "Восстанавливает 1 HP (не больше максимума)"},
+    ["Inverter"] = {Icon = "🔄", Short = "Инвертор", Desc = "Меняет текущий патрон на противоположный (боевой <-> холостой)"},
+    ["Burner Phone"] = {Icon = "📱", Short = "Телефон", Desc = "Показывает случайный патрон дальше в обойме (не текущий)"},
+    ["Expired Medicine"] = {Icon = "💊", Short = "Таблетки", Desc = "50%: +2 HP, 50%: -1 HP (можно умереть!)"},
+    ["Adrenaline"] = {Icon = "💉", Short = "Адреналин", Desc = "Украсть предмет соперника и сразу применить (Адреналин украсть нельзя)"}
+}
+
+local ITEM_NAMES = {}
+for k in pairs(ITEMS_DB) do table.insert(ITEM_NAMES, k) end
+-- КОНЕЦ ЧАСТИ 1В
+-- НАЧАЛО ЧАСТИ 2А
+local function Launch3DBuckshot()
+    if ScreenGui:FindFirstChild("MainFrame") or ScreenGui:FindFirstChild("IntroOrb") then return end
+
+    local GameState = {
+        Round = 1, MaxHP = 4, PlayerHP = 4, DealerHP = 4,
+        Shells = {}, PlayerItems = {}, DealerItems = {},
+        Turn = "Player", SawActive = false,
+        DealerCuffed = false, PlayerCuffed = false,
+        StealingMode = false, GameOver = false, Busy = false
+    }
+
+    local IntroOrb = Instance.new("Frame", ScreenGui)
+    IntroOrb.Name = "IntroOrb"
+    IntroOrb.Size = UDim2.new(0, 56, 0, 56)
+    IntroOrb.Position = UDim2.new(0.5, -28, 0, -70)
+    IntroOrb.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+    IntroOrb.ZIndex = 20
+    Instance.new("UICorner", IntroOrb).CornerRadius = UDim.new(1, 0)
+    local orbStroke = Instance.new("UIStroke", IntroOrb)
+    orbStroke.Color = Color3.fromRGB(255, 200, 50)
+    orbStroke.Thickness = 2
+
+    local BoltLabel = Instance.new("TextLabel", IntroOrb)
+    BoltLabel.Size = UDim2.new(1, 0, 1, 0)
+    BoltLabel.BackgroundTransparency = 1
+    BoltLabel.Text = "⚡"
+    BoltLabel.TextColor3 = Color3.fromRGB(255, 225, 65)
+    BoltLabel.Font = Enum.Font.Code
+    BoltLabel.TextSize = 28
+    BoltLabel.ZIndex = 21
+
+    local MainFrame = Instance.new("Frame", ScreenGui)
+    MainFrame.Name = "MainFrame"
+    MainFrame.Size = UDim2.new(0, 500, 0, 340)
+    MainFrame.Position = UDim2.new(0.5, -250, 0.5, -170)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(9, 6, 7)
+    MainFrame.ClipsDescendants = true
+    MainFrame.Visible = false
+    Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+    local MainStroke = Instance.new("UIStroke", MainFrame)
+    MainStroke.Color = Color3.fromRGB(100, 25, 25)
+    MainStroke.Thickness = 2
+
+    local WinScale = Instance.new("UIScale", MainFrame)
+    WinScale.Scale = 0.01
+
+    local FlashOverlay = Instance.new("Frame", MainFrame)
+    FlashOverlay.Size = UDim2.new(1, 0, 1, 0)
+    FlashOverlay.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    FlashOverlay.BackgroundTransparency = 1
+    FlashOverlay.ZIndex = 10
+
+    local TopBar = Instance.new("Frame", MainFrame)
+    TopBar.Size = UDim2.new(1, 0, 0, 34)
+    TopBar.BackgroundColor3 = Color3.fromRGB(17, 10, 11)
+    makeDraggable(MainFrame, TopBar)
+
+    local Title = Instance.new("TextLabel", TopBar)
+    Title.Size = UDim2.new(1, -80, 1, 0)
+    Title.Position = UDim2.new(0, 12, 0, 0)
+    Title.BackgroundTransparency = 1
+    Title.Text = "BLOX ROULETTE"
+    Title.TextColor3 = Color3.fromRGB(240, 55, 55)
+    Title.Font = Enum.Font.Code
+    Title.TextSize = 14
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- Журнал убран: вместо него субтитры внизу (см. subtitle ниже). Заглушки, чтобы остальной код не ломался.
+    local SideLog = Instance.new("Frame")
+    SideLog.Visible = false
+    local function addSideLog() end
+    local function syncSidePanel() end
+-- КОНЕЦ ЧАСТИ 2А
+-- НАЧАЛО ЧАСТИ 2Б
+    local MinBtn = Instance.new("TextButton", TopBar)
+    MinBtn.Size = UDim2.new(0, 28, 0, 24)
+    MinBtn.Position = UDim2.new(1, -64, 0, 5)
+    MinBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 46)
+    MinBtn.Text = "_"
+    MinBtn.TextColor3 = Color3.new(1,1,1)
+    MinBtn.Font = Enum.Font.Code
+    Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 4)
+
+    local CloseBtn = Instance.new("TextButton", TopBar)
+    CloseBtn.Size = UDim2.new(0, 28, 0, 24)
+    CloseBtn.Position = UDim2.new(1, -32, 0, 5)
+    CloseBtn.BackgroundColor3 = Color3.fromRGB(160, 30, 30)
+    CloseBtn.Text = "X"
+    CloseBtn.TextColor3 = Color3.new(1,1,1)
+    CloseBtn.Font = Enum.Font.Code
+    Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 4)
+
+    local Content = Instance.new("Frame", MainFrame)
+    Content.Size = UDim2.new(1, -20, 1, -44)
+    Content.Position = UDim2.new(0, 10, 0, 38)
+    Content.BackgroundTransparency = 1
+
+    local minimized = false
+    MinBtn.MouseButton1Click:Connect(function()
+        minimized = not minimized
+        Content.Visible = not minimized
+        SideLog.Visible = not minimized
+        local targetSize = minimized and UDim2.new(0, 500, 0, 34) or UDim2.new(0, 500, 0, 340)
+        TweenService:Create(MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize}):Play()
+    end)
+
+    CloseBtn.MouseButton1Click:Connect(function()
+        local closeTw = TweenService:Create(WinScale, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Scale = 0})
+        closeTw:Play()
+        SideLog:Destroy()
+        closeTw.Completed:Wait()
+        MainFrame:Destroy()
+    end)
+
+    local function spawnMiniExplosion(impactOffset)
+        playSFX(SOUNDS.Shot, 1.85)
+        local ring = Instance.new("Frame", ScreenGui)
+        ring.Size = UDim2.new(0, 10, 0, 10)
+        ring.Position = UDim2.new(0.5, impactOffset.X - 5, 0.5, impactOffset.Y - 5)
+        ring.BackgroundTransparency = 1
+        ring.ZIndex = 25
+        Instance.new("UICorner", ring).CornerRadius = UDim.new(1, 0)
+        local rStroke = Instance.new("UIStroke", ring)
+        rStroke.Color = Color3.fromRGB(255, 225, 70)
+        rStroke.Thickness = 2.5
+
+        TweenService:Create(ring, TweenInfo.new(0.32, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = UDim2.new(0, 64, 0, 64),
+            Position = UDim2.new(0.5, impactOffset.X - 32, 0.5, impactOffset.Y - 32)
+        }):Play()
+        TweenService:Create(rStroke, TweenInfo.new(0.32), {Transparency = 1}):Play()
+        task.delay(0.35, function() if ring then ring:Destroy() end end)
+
+        for i = 1, 6 do
+            local spark = Instance.new("Frame", ScreenGui)
+            spark.Size = UDim2.new(0, 5, 0, 5)
+            spark.Position = UDim2.new(0.5, impactOffset.X, 0.5, impactOffset.Y)
+            spark.BackgroundColor3 = (i % 2 == 0) and Color3.fromRGB(255, 230, 80) or Color3.fromRGB(255, 90, 60)
+            spark.ZIndex = 26
+            Instance.new("UICorner", spark).CornerRadius = UDim.new(1, 0)
+
+            local angle = math.rad(i * 60 + math.random(-15, 15))
+            local dist = math.random(24, 38)
+            TweenService:Create(spark, TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Position = UDim2.new(0.5, impactOffset.X + math.cos(angle) * dist, 0.5, impactOffset.Y + math.sin(angle) * dist),
+                BackgroundTransparency = 1,
+                Size = UDim2.new(0, 2, 0, 2)
+            }):Play()
+            task.delay(0.3, function() if spark then spark:Destroy() end end)
+        end
+
+        Title.Text = "BLOX ROULETTE ⚡ // 3D EDITION"
+        Title.TextColor3 = Color3.fromRGB(255, 230, 100)
+        Title.Position = UDim2.new(0, 16, 0, -2)
+        TweenService:Create(Title, TweenInfo.new(0.25, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out), {
+            Position = UDim2.new(0, 12, 0, 0),
+            TextColor3 = Color3.fromRGB(240, 55, 55)
+        }):Play()
+    end
+
+    task.spawn(function()
+        playSFX(SOUNDS.Heal, 1.3)
+        local slideTw = TweenService:Create(IntroOrb, TweenInfo.new(0.42, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Position = UDim2.new(0.5, -28, 0.5, -28)
+        })
+        slideTw:Play()
+        slideTw.Completed:Wait()
+
+        MainFrame.Visible = true
+        TweenService:Create(IntroOrb, TweenInfo.new(0.42, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Rotation = 360,
+            BackgroundTransparency = 1
+        }):Play()
+        orbStroke.Transparency = 1
+
+        local openTw = TweenService:Create(WinScale, TweenInfo.new(0.42, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1})
+        openTw:Play()
+        openTw.Completed:Wait()
+
+        if MainFrame.Parent then
+            SideLog.Visible = true
+            syncSidePanel()
+        end
+
+        local p0, p1, p2 = Vector2.new(-14, -14), Vector2.new(-250, -90), Vector2.new(-172, -246)
+        for step = 1, 16 do
+            local t = step / 16
+            local pos = ((1 - t)^2) * p0 + 2 * (1 - t) * t * p1 + (t^2) * p2
+            IntroOrb.Position = UDim2.new(0.5, pos.X, 0.5, pos.Y)
+            IntroOrb.Rotation = 360 + (t * 360)
+            BoltLabel.TextSize = 28 - (t * 12)
+            task.wait(0.016)
+        end
+        IntroOrb:Destroy()
+        spawnMiniExplosion(Vector2.new(-164, -242))
+    end)
+-- КОНЕЦ ЧАСТИ 2Б
+-- НАЧАЛО ЧАСТИ 2В (3D-СЦЕНА: комната, стол, Дилер, дробовик)
+    local RunService = game:GetService("RunService")
+    local VIEW_W, VIEW_H = 480, 244
+    local ASPECT = VIEW_W / VIEW_H
+    local CAM_FOV = 60
+    local BASE_CAM = CFrame.lookAt(Vector3.new(0, 8.4, 12.2), Vector3.new(0, 0.3, -0.8))
+    local camTarget, camCur = BASE_CAM, BASE_CAM -- камера плавно едет к camTarget (лупа - крупный план)
+    local DEALER_Z = -4.6
+    local DEALER_ITEM_Z, PLAYER_ITEM_Z, ITEM_SPACING = -1.6, 3.2, 2.2
+    local DEALER_BANK = Vector3.new(-6.2, 0, -1.2)
+    local PLAYER_BANK = Vector3.new(6.2, 0, 3.0)
+    local shake = 0
+
+    local Viewport = Instance.new("ViewportFrame", Content)
+    Viewport.Size = UDim2.new(1, 0, 0, VIEW_H)
+    Viewport.Position = UDim2.new(0, 0, 0, 0)
+    Viewport.BackgroundColor3 = Color3.fromRGB(5, 3, 4)
+    Viewport.Ambient = Color3.fromRGB(74, 54, 52)
+    Viewport.LightColor = Color3.fromRGB(205, 135, 112)
+    Viewport.LightDirection = Vector3.new(-0.35, -1, -0.8)
+    Instance.new("UICorner", Viewport).CornerRadius = UDim.new(0, 6)
+    local ViewStroke = Instance.new("UIStroke", Viewport)
+    ViewStroke.Color = Color3.fromRGB(110, 30, 30)
+    ViewStroke.Thickness = 1.5
+
+    local WorldModel = Instance.new("WorldModel", Viewport)
+    local Camera = Instance.new("Camera", Viewport)
+    Camera.FieldOfView = CAM_FOV
+    Camera.CFrame = BASE_CAM
+    Viewport.CurrentCamera = Camera
+
+    local TAN_HALF = math.tan(math.rad(CAM_FOV) / 2)
+    -- Проекция 3D-точки на экран окна: возвращает (x, y) в долях 0..1 и пикселей на 1 единицу мира
+    local function project(worldPos)
+        local rel = BASE_CAM:PointToObjectSpace(worldPos)
+        local depth = -rel.Z
+        if depth < 0.5 then return 0.5, 0.5, 20 end
+        local nx = rel.X / (depth * TAN_HALF * ASPECT)
+        local ny = rel.Y / (depth * TAN_HALF)
+        return nx * 0.5 + 0.5, 0.5 - ny * 0.5, VIEW_H / (2 * TAN_HALF * depth)
+    end
+
+    -- Конструктор деталей: block / ball / cyl(ось X) / cylY(стоит вертикально, size=(диаметр, высота, диаметр)) / cylZ(ось Z, size=(диаметр, диаметр, длина))
+    local function mk(parent, kind, size, rel, color, material, transparency)
+        local p = Instance.new("Part")
+        p.Anchored = true
+        p.CanCollide = false
+        p.CastShadow = false
+        p.Material = material or Enum.Material.SmoothPlastic
+        p.Color = color
+        p.Transparency = transparency or 0
+        if kind == "ball" then
+            p.Shape = Enum.PartType.Ball
+            p.Size = size
+        elseif kind == "cyl" then
+            p.Shape = Enum.PartType.Cylinder
+            p.Size = size
+        elseif kind == "cylY" then
+            p.Shape = Enum.PartType.Cylinder
+            p.Size = Vector3.new(size.Y, size.X, size.X)
+            rel = rel * CFrame.Angles(0, 0, math.pi / 2)
+        elseif kind == "cylZ" then
+            p.Shape = Enum.PartType.Cylinder
+            p.Size = Vector3.new(size.Z, size.X, size.X)
+            rel = rel * CFrame.Angles(0, math.pi / 2, 0)
+        else
+            p.Size = size
+        end
+        p.CFrame = rel
+        p.Parent = parent
+        return p
+    end
+
+    local function newModel(parent)
+        local m = Instance.new("Model")
+        local root = Instance.new("Part")
+        root.Name = "Root"
+        root.Size = Vector3.new(0.2, 0.2, 0.2)
+        root.Transparency = 1
+        root.Anchored = true
+        root.CanCollide = false
+        root.CFrame = CFrame.new()
+        root.Parent = m
+        m.PrimaryPart = root
+        m.Parent = parent
+        return m
+    end
+
+    local function limb(parent, a, b, thick, color)
+        local len = (b - a).Magnitude
+        return mk(parent, "block", Vector3.new(thick, thick, len), CFrame.lookAt((a + b) / 2, b), color, Enum.Material.Fabric)
+    end
+
+    local FX = {lamps = {}, dust = {}}
+
+    -- КОМНАТА И СТОЛ: мрачный кирпичный подвал, сценический свет, потёртый стол
+    do
+        local WOOD = Color3.fromRGB(40, 26, 20)
+        local BRICK = Color3.fromRGB(62, 32, 29)
+        local MORTAR = Color3.fromRGB(20, 10, 11)
+        local DARKM = Color3.fromRGB(14, 13, 15)
+        local function block(size, pos, color, material, transp)
+            return mk(WorldModel, "block", size, CFrame.new(pos), color, material, transp)
+        end
+        local function cable(a, b, sag, thick)
+            local prev = a
+            for i = 1, 8 do
+                local t = i / 8
+                local p = a:Lerp(b, t) - Vector3.new(0, sag * 4 * t * (1 - t), 0)
+                limb(WorldModel, prev, p, thick or 0.06, DARKM)
+                prev = p
+            end
+        end
+
+        -- пол и кирпичные стены
+        block(Vector3.new(90, 1, 70), Vector3.new(0, -3.6, 0), Color3.fromRGB(9, 7, 8), Enum.Material.Concrete)
+        block(Vector3.new(70, 26, 0.6), Vector3.new(0, 8, -10.5), BRICK, Enum.Material.Brick)
+        block(Vector3.new(0.6, 26, 40), Vector3.new(-14.5, 8, -2), BRICK, Enum.Material.Brick)
+        block(Vector3.new(0.6, 26, 40), Vector3.new(14.5, 8, -2), BRICK, Enum.Material.Brick)
+        for r = 0, 12 do
+            local y = -2.6 + r * 0.8
+            block(Vector3.new(70, 0.07, 0.05), Vector3.new(0, y, -10.17), MORTAR)
+            block(Vector3.new(0.05, 0.07, 40), Vector3.new(-14.17, y, -2), MORTAR)
+            block(Vector3.new(0.05, 0.07, 40), Vector3.new(14.17, y, -2), MORTAR)
+            local off = (r % 2) * 1.0
+            for x = -12 + off, 12, 2.0 do
+                block(Vector3.new(0.07, 0.8, 0.05), Vector3.new(x, y + 0.4, -10.17), MORTAR)
+            end
+        end
+        -- неровные, закопчённые кирпичи
+        local rng = Random.new(11)
+        for _ = 1, 46 do
+            local r = rng:NextInteger(0, 11)
+            local c = rng:NextInteger(0, 11)
+            local off = (r % 2) * 1.0
+            local k = rng:NextNumber(0.45, 1.5)
+            block(Vector3.new(1.85, 0.7, 0.03), Vector3.new(-11 + off + c * 2, -2.6 + r * 0.8 + 0.4, -10.188),
+                Color3.fromRGB(62 * k, 32 * k, 29 * k), Enum.Material.Brick)
+        end
+
+        -- трубы и опоры
+        for _, x in ipairs({-9, -5.5, 5.5, 9}) do
+            block(Vector3.new(0.5, 22, 0.5), Vector3.new(x, 6, -9.9), Color3.fromRGB(28, 22, 24), Enum.Material.Metal)
+        end
+        block(Vector3.new(70, 0.3, 0.3), Vector3.new(0, 5.5, -9.8), Color3.fromRGB(24, 19, 21), Enum.Material.Metal)
+
+        -- свисающие провода
+        cable(Vector3.new(-13.5, 6.1, -9.9), Vector3.new(-4.5, 5.9, -9.9), 1.3)
+        cable(Vector3.new(-6, 6.2, -9.9), Vector3.new(4, 6.0, -9.9), 1.7)
+        cable(Vector3.new(3, 6.1, -9.9), Vector3.new(13.5, 6.3, -9.9), 1.4)
+        cable(Vector3.new(-9, 6.2, -9.9), Vector3.new(-9.3, 2.6, -9.6), 0.3, 0.05)
+        cable(Vector3.new(8, 6.2, -9.9), Vector3.new(8.4, 2.2, -9.6), 0.4, 0.05)
+
+        -- сценические прожекторы по бокам от монстра
+        local function spot(x)
+            local pos = Vector3.new(x, 4.9, -6.4)
+            local aim = Vector3.new(x * 0.2, 0.4, -1.2)
+            local cf = CFrame.lookAt(pos, aim)
+            mk(WorldModel, "cylZ", Vector3.new(1.3, 1.3, 1.4), cf, Color3.fromRGB(14, 13, 15), Enum.Material.Metal)
+            mk(WorldModel, "cylZ", Vector3.new(0.9, 0.9, 0.5), cf * CFrame.new(0, 0, 0.9), DARKM, Enum.Material.Metal)
+            local lens = mk(WorldModel, "cylZ", Vector3.new(1.1, 1.1, 0.08), cf * CFrame.new(0, 0, -0.72), Color3.fromRGB(255, 196, 140), Enum.Material.Neon, 0.1)
+            table.insert(FX.lamps, {p = lens, base = 0.1})
+            mk(WorldModel, "block", Vector3.new(1.5, 0.05, 0.55), cf * CFrame.new(0, 0.8, -0.95) * CFrame.Angles(math.rad(-30), 0, 0), DARKM, Enum.Material.Metal)
+            mk(WorldModel, "block", Vector3.new(1.5, 0.05, 0.55), cf * CFrame.new(0, -0.8, -0.95) * CFrame.Angles(math.rad(30), 0, 0), DARKM, Enum.Material.Metal)
+            mk(WorldModel, "block", Vector3.new(0.05, 1.4, 0.55), cf * CFrame.new(0.8, 0, -0.95) * CFrame.Angles(0, math.rad(-30), 0), DARKM, Enum.Material.Metal)
+            mk(WorldModel, "block", Vector3.new(0.05, 1.4, 0.55), cf * CFrame.new(-0.8, 0, -0.95) * CFrame.Angles(0, math.rad(30), 0), DARKM, Enum.Material.Metal)
+            block(Vector3.new(1.9, 0.1, 0.1), Vector3.new(x, 5.75, -6.4), DARKM, Enum.Material.Metal)
+            block(Vector3.new(0.1, 0.9, 0.1), Vector3.new(x - 0.9, 5.3, -6.4), DARKM, Enum.Material.Metal)
+            block(Vector3.new(0.1, 0.9, 0.1), Vector3.new(x + 0.9, 5.3, -6.4), DARKM, Enum.Material.Metal)
+            block(Vector3.new(0.14, 3, 0.14), Vector3.new(x, 7.2, -6.4), DARKM, Enum.Material.Metal)
+            local L = (aim - pos).Magnitude
+            local beam = mk(WorldModel, "block", Vector3.new(1.5, 1.5, L), CFrame.lookAt(pos:Lerp(aim, 0.5), aim), Color3.fromRGB(255, 150, 105), Enum.Material.Neon, 0.945)
+            table.insert(FX.lamps, {p = beam, base = 0.945})
+            cable(Vector3.new(x * 1.9, 6.2, -9.8), Vector3.new(x, 4.7, -7.0), 0.8)
+        end
+        spot(-3.9)
+        spot(3.9)
+
+        -- аварийная красная лампа
+        local bulb = mk(WorldModel, "ball", Vector3.new(0.35, 0.35, 0.35), CFrame.new(-7.6, 4.3, -10.0), Color3.fromRGB(255, 40, 30), Enum.Material.Neon, 0.05)
+        table.insert(FX.lamps, {p = bulb, base = 0.05})
+        local bulbGlow = mk(WorldModel, "ball", Vector3.new(1.3, 1.3, 1.3), CFrame.new(-7.6, 4.3, -10.0), Color3.fromRGB(255, 30, 20), Enum.Material.Neon, 0.93)
+        table.insert(FX.lamps, {p = bulbGlow, base = 0.93})
+
+        -- слева: ящик, колонка и старая магнитола
+        block(Vector3.new(3.2, 3.4, 2.6), Vector3.new(-10.3, -1.4, -4.2), WOOD, Enum.Material.Wood)
+        block(Vector3.new(2.6, 3.0, 1.9), Vector3.new(-10.3, 1.8, -4.2), Color3.fromRGB(26, 25, 27), Enum.Material.Metal)
+        mk(WorldModel, "cylZ", Vector3.new(1.7, 1.7, 0.1), CFrame.new(-10.3, 1.35, -3.22), Color3.fromRGB(10, 10, 11), Enum.Material.Metal)
+        mk(WorldModel, "cylZ", Vector3.new(0.8, 0.8, 0.12), CFrame.new(-10.3, 1.35, -3.2), Color3.fromRGB(46, 40, 38), Enum.Material.Metal)
+        mk(WorldModel, "cylZ", Vector3.new(0.5, 0.5, 0.1), CFrame.new(-10.3, 2.65, -3.22), Color3.fromRGB(10, 10, 11), Enum.Material.Metal)
+        block(Vector3.new(2.4, 0.8, 1.3), Vector3.new(-10.3, 3.7, -4.2), Color3.fromRGB(70, 66, 62), Enum.Material.Metal)
+        block(Vector3.new(0.5, 0.18, 0.04), Vector3.new(-10.9, 3.7, -3.54), Color3.fromRGB(255, 50, 40), Enum.Material.Neon, 0.3)
+
+        -- справа: ящик и аппаратура с зелёным дисплеем
+        block(Vector3.new(3.0, 3.4, 2.4), Vector3.new(10.2, -1.4, -3.8), WOOD, Enum.Material.Wood)
+        block(Vector3.new(2.6, 1.0, 1.7), Vector3.new(10.2, 0.8, -3.8), Color3.fromRGB(38, 40, 38), Enum.Material.Metal)
+        local disp = block(Vector3.new(1.3, 0.22, 0.04), Vector3.new(9.8, 0.95, -2.93), Color3.fromRGB(80, 255, 150), Enum.Material.Neon, 0.25)
+        table.insert(FX.lamps, {p = disp, base = 0.25})
+        for k = 0, 2 do
+            mk(WorldModel, "cylZ", Vector3.new(0.28, 0.28, 0.12), CFrame.new(10.75 + k * 0.38, 0.7, -2.92), Color3.fromRGB(150, 145, 135), Enum.Material.Metal)
+        end
+        block(Vector3.new(1.2, 0.5, 0.8), Vector3.new(10.8, 1.55, -3.9), Color3.fromRGB(30, 31, 30), Enum.Material.Metal)
+
+        -- СТОЛ (длинный): влезают оба ряда предметов, дробовик и оба банка здоровья
+        block(Vector3.new(16, 0.4, 9), Vector3.new(0, -0.2, 1.0), Color3.fromRGB(30, 46, 34), Enum.Material.Fabric)
+        block(Vector3.new(15, 3, 8), Vector3.new(0, -1.9, 1.0), Color3.fromRGB(18, 12, 10), Enum.Material.Wood)
+        block(Vector3.new(16.8, 0.5, 0.45), Vector3.new(0, 0.02, 5.72), WOOD, Enum.Material.Wood)
+        block(Vector3.new(16.8, 0.5, 0.45), Vector3.new(0, 0.02, -3.72), WOOD, Enum.Material.Wood)
+        block(Vector3.new(0.45, 0.5, 9.4), Vector3.new(8.2, 0.02, 1.0), WOOD, Enum.Material.Wood)
+        block(Vector3.new(0.45, 0.5, 9.4), Vector3.new(-8.2, 0.02, 1.0), WOOD, Enum.Material.Wood)
+
+        -- облупленная меловая разметка на столе
+        local LINE = Color3.fromRGB(170, 168, 150)
+        local function ln(x1, z1, x2, z2)
+            local a, b = Vector3.new(x1, 0.012, z1), Vector3.new(x2, 0.012, z2)
+            mk(WorldModel, "block", Vector3.new(0.06, 0.01, (b - a).Magnitude), CFrame.lookAt((a + b) / 2, b), LINE, Enum.Material.SmoothPlastic, 0.5)
+        end
+        local function rect(x1, z1, x2, z2)
+            ln(x1, z1, x2, z1); ln(x2, z1, x2, z2); ln(x2, z2, x1, z2); ln(x1, z2, x1, z1)
+        end
+        rect(-7.7, -3.1, 7.7, 5.1)
+        rect(-3.6, -0.9, 3.6, 0.9)
+        rect(-4.7, -2.5, 4.7, -0.7)
+        rect(-4.7, 2.3, 4.7, 4.1)
+        ln(-7.7, 1.5, -3.6, 1.5)
+        ln(3.6, 1.5, 7.7, 1.5)
+
+        -- тёмное пятно крови на сукне
+        mk(WorldModel, "cylY", Vector3.new(2.6, 0.015, 2.6), CFrame.new(-1.4, 0.011, -0.7), Color3.fromRGB(62, 10, 10), Enum.Material.Fabric, 0.2)
+        mk(WorldModel, "cylY", Vector3.new(0.9, 0.015, 0.9), CFrame.new(-2.7, 0.012, -0.1), Color3.fromRGB(70, 10, 10), Enum.Material.Fabric, 0.2)
+        mk(WorldModel, "cylY", Vector3.new(0.35, 0.015, 0.35), CFrame.new(-0.2, 0.012, 0.9), Color3.fromRGB(70, 10, 10), Enum.Material.Fabric, 0.2)
+
+        -- пылинки в луче света
+        local drng = Random.new(5)
+        for _ = 1, 18 do
+            local d = mk(WorldModel, "ball", Vector3.new(0.05, 0.05, 0.05), CFrame.new(), Color3.fromRGB(190, 140, 125), Enum.Material.Neon, 0.35)
+            table.insert(FX.dust, {p = d, x = drng:NextNumber(-6, 6), y = drng:NextNumber(0.3, 6), z = drng:NextNumber(-6, 3), ph = drng:NextNumber(0, 6.28)})
+        end
+    end
+
+    -- 3D-ДРОБОВИК
+    local GUN_S = 1.35
+    local GunRoot = Instance.new("Part")
+    GunRoot.Name = "GunRoot"
+    GunRoot.Size = Vector3.new(0.2, 0.2, 0.2)
+    GunRoot.Transparency = 1
+    GunRoot.Anchored = true
+    GunRoot.CanCollide = false
+    GunRoot.CFrame = CFrame.new(0, 0.55, 0) * CFrame.Angles(0, math.rad(90), 0)
+    GunRoot.Parent = WorldModel
+
+    local gunParts = {}
+    local gunTip, gunMuzzle, gunCut
+    local gunSawedOverride = false
+    do
+        local function gp(kind, size, offset, color, material, transparency)
+            local p = mk(WorldModel, kind, size * GUN_S, GunRoot.CFrame * CFrame.new(offset * GUN_S), color, material or Enum.Material.Metal, transparency)
+            table.insert(gunParts, {p = p, rel = GunRoot.CFrame:ToObjectSpace(p.CFrame)})
+            return p
+        end
+        gp("block", Vector3.new(0.26, 0.36, 1.1), Vector3.new(0, -0.05, 1.1), Color3.fromRGB(95, 50, 25), Enum.Material.Wood)
+        gp("block", Vector3.new(0.28, 0.4, 0.08), Vector3.new(0, -0.05, 1.68), Color3.fromRGB(30, 30, 34))
+        gp("block", Vector3.new(0.3, 0.32, 0.9), Vector3.new(0, 0.05, 0.2), Color3.fromRGB(35, 35, 40))
+        gp("block", Vector3.new(0.1, 0.05, 0.35), Vector3.new(0, -0.14, 0.15), Color3.fromRGB(10, 10, 12))
+        gp("block", Vector3.new(0.34, 0.28, 0.8), Vector3.new(0, -0.05, -0.75), Color3.fromRGB(85, 45, 20), Enum.Material.Wood)
+        gp("cylZ", Vector3.new(0.2, 0.2, 1.3), Vector3.new(0, 0.1, -0.8), Color3.fromRGB(55, 55, 62))
+        gunTip = gp("cylZ", Vector3.new(0.19, 0.19, 0.8), Vector3.new(0, 0.1, -1.8), Color3.fromRGB(62, 62, 70))
+        gunMuzzle = gp("ball", Vector3.new(0.13, 0.13, 0.13), Vector3.new(0, 0.1, -2.2), Color3.fromRGB(0, 0, 0))
+        gunCut = gp("cylZ", Vector3.new(0.215, 0.215, 0.04), Vector3.new(0, 0.1, -1.42), Color3.fromRGB(215, 215, 220), Enum.Material.Metal, 1)
+        gp("block", Vector3.new(0.05, 0.07, 0.05), Vector3.new(0, 0.24, -1.0), Color3.fromRGB(200, 200, 205))
+    end
+
+    local function syncGunParts()
+        local cf = GunRoot.CFrame
+        for _, g in ipairs(gunParts) do g.p.CFrame = cf * g.rel end
+        local sawed = GameState.SawActive or gunSawedOverride
+        gunTip.Transparency = sawed and 1 or 0
+        gunMuzzle.Transparency = sawed and 1 or 0
+        gunCut.Transparency = sawed and 0 or 1
+    end
+    syncGunParts()
+
+    -- 3D-ДИЛЕР как в оригинале: бледная вытянутая голова, ПУСТЫЕ чёрные глазницы, огромная улыбка с рядами зубов
+    local SKIN = Color3.fromRGB(196, 188, 172)
+    local SKIN_D = Color3.fromRGB(118, 110, 100)
+    local SUIT = Color3.fromRGB(19, 15, 17)
+    local BONE = Color3.fromRGB(238, 232, 210)
+    local HR = 0.95
+    local HY = 1.1
+    local MOUTH_N = 17
+    local DealerBody = newModel(WorldModel)
+    local DealerHead = newModel(WorldModel)
+    local headBall
+    local eyeSet, mouthTop, mouthBot, mouthBack, cuffParts = {}, {}, {}, {}, {}
+    do
+        -- туловище: сутулый костюм, белая рубашка и тёмный галстук
+        mk(DealerBody, "block", Vector3.new(3.1, 2.8, 1.3), CFrame.new(0, 1.4, 0), SUIT, Enum.Material.Fabric)
+        mk(DealerBody, "ball", Vector3.new(3.3, 1.8, 1.8), CFrame.new(0, 2.75, -0.25), SUIT, Enum.Material.Fabric)
+        mk(DealerBody, "block", Vector3.new(0.9, 1.9, 0.06), CFrame.new(0, 1.75, 0.68), Color3.fromRGB(205, 200, 188), Enum.Material.Fabric)
+        mk(DealerBody, "block", Vector3.new(0.16, 1.3, 0.05), CFrame.new(0, 1.6, 0.72), Color3.fromRGB(14, 10, 12), Enum.Material.Fabric)
+        mk(DealerBody, "block", Vector3.new(0.55, 1.5, 0.1), CFrame.new(-0.9, 1.8, 0.66) * CFrame.Angles(0, 0, math.rad(10)), Color3.fromRGB(12, 9, 11), Enum.Material.Fabric)
+        mk(DealerBody, "block", Vector3.new(0.55, 1.5, 0.1), CFrame.new(0.9, 1.8, 0.66) * CFrame.Angles(0, 0, math.rad(-10)), Color3.fromRGB(12, 9, 11), Enum.Material.Fabric)
+        mk(DealerBody, "cylY", Vector3.new(0.7, 0.7, 0.7), CFrame.new(0, 2.95, 0), SKIN)
+
+        for _, sgn in ipairs({-1, 1}) do
+            mk(DealerBody, "ball", Vector3.new(1.2, 1.1, 1.2), CFrame.new(1.55 * sgn, 2.5, 0), SUIT, Enum.Material.Fabric)
+            local shoulder = Vector3.new(1.5 * sgn, 2.45, 0.1)
+            local elbow = Vector3.new(1.95 * sgn, 1.2, 0.9)
+            local hand = Vector3.new(1.35 * sgn, 0.28, 1.9)
+            limb(DealerBody, shoulder, elbow, 0.5, SUIT)
+            limb(DealerBody, elbow, hand, 0.34, SKIN)
+            mk(DealerBody, "ball", Vector3.new(0.56, 0.4, 0.62), CFrame.new(hand), SKIN)
+            for k = -1, 2 do
+                local o = Vector3.new((k - 0.5) * 0.16, 0, 0)
+                limb(DealerBody, hand + o + Vector3.new(0, -0.02, 0.2), hand + o * 1.3 + Vector3.new(0, -0.1, 0.95), 0.06, SKIN)
+            end
+            table.insert(cuffParts, mk(DealerBody, "block", Vector3.new(0.6, 0.2, 0.6), CFrame.new(1.4 * sgn, 0.42, 1.65), Color3.fromRGB(150, 150, 158), Enum.Material.Metal, 1))
+        end
+        for k = 0, 6 do
+            table.insert(cuffParts, mk(DealerBody, "block", Vector3.new(0.2, 0.1, 0.1), CFrame.new(-1.0 + k * (2.0 / 6), 0.36, 1.72), Color3.fromRGB(130, 130, 140), Enum.Material.Metal, 1))
+        end
+
+        -- голова: лысая, вытянутая
+        headBall = mk(DealerHead, "ball", Vector3.new(HR * 2, HY * 2, HR * 2), CFrame.new(), SKIN)
+        mk(DealerHead, "ball", Vector3.new(1.3, 0.9, 1.1), CFrame.new(0, -0.8, 0.2), SKIN)
+        mk(DealerHead, "ball", Vector3.new(1.5, 0.3, 0.5), CFrame.new(0, 0.55, 0.62), SKIN_D, nil, 0.35)
+        mk(DealerHead, "ball", Vector3.new(0.2, 0.42, 0.26), CFrame.new(0, -0.02, 0.92), SKIN)
+        for _, sgn in ipairs({-1, 1}) do
+            mk(DealerHead, "ball", Vector3.new(0.2, 0.55, 0.16), CFrame.new(0.95 * sgn, 0, 0), SKIN)
+            mk(DealerHead, "ball", Vector3.new(0.07, 0.16, 0.06), CFrame.new(0.07 * sgn, -0.1, 0.93), Color3.fromRGB(40, 30, 28))
+            -- тёмные впадины вокруг глазниц
+            mk(DealerHead, "ball", Vector3.new(0.8, 0.95, 0.3), CFrame.new(0.36 * sgn, 0.18, 0.68), SKIN_D)
+            -- ПУСТЫЕ глазницы: чёрные провалы без зрачков
+            mk(DealerHead, "ball", Vector3.new(0.62, 0.78, 0.34), CFrame.new(0.36 * sgn, 0.18, 0.74), Color3.fromRGB(2, 1, 1))
+            local e = {sgn = sgn}
+            e.eye = mk(DealerHead, "ball", Vector3.new(0.5, 0.62, 0.2), CFrame.new(0.36 * sgn, 0.18, 0.82), Color3.fromRGB(3, 2, 2))
+            e.pupil = mk(DealerHead, "ball", Vector3.new(0.05, 0.05, 0.05), CFrame.new(0.36 * sgn, 0.18, 0.95), Color3.fromRGB(3, 2, 2), nil, 1)
+            e.brow = mk(DealerHead, "block", Vector3.new(0.58, 0.07, 0.08), CFrame.new(0.36 * sgn, 0.62, 0.82), SKIN_D, nil, 0.3)
+            e.x1 = mk(DealerHead, "block", Vector3.new(0.46, 0.07, 0.06), CFrame.new(0.36 * sgn, 0.18, 0.95) * CFrame.Angles(0, 0, math.rad(45)), BONE, nil, 1)
+            e.x2 = mk(DealerHead, "block", Vector3.new(0.46, 0.07, 0.06), CFrame.new(0.36 * sgn, 0.18, 0.95) * CFrame.Angles(0, 0, math.rad(-45)), BONE, nil, 1)
+            table.insert(eyeSet, e)
+        end
+        -- ОГРОМНАЯ УЛЫБКА: два ряда ровных зубов поверх тёмной пасти
+        for i = 1, MOUTH_N do
+            mouthBack[i] = mk(DealerHead, "block", Vector3.new(0.1, 0.4, 0.06), CFrame.new(), Color3.fromRGB(16, 3, 3))
+            mouthTop[i] = mk(DealerHead, "block", Vector3.new(0.1, 0.24, 0.08), CFrame.new(), BONE)
+            mouthBot[i] = mk(DealerHead, "block", Vector3.new(0.1, 0.22, 0.08), CFrame.new(), Color3.fromRGB(222, 214, 190))
+        end
+    end
+
+    -- Настроение Дилера (игровой код пишет DealerFace.Text = "[ 😵 _ 😵 ]" - здесь это превращается в мимику)
+    local MOODS = {
+        neutral = {curve = 0.26, width = 1.0, open = 0.05, eyeL = 1, eyeR = 1, pupil = 1, brow = 0, pitch = 0, xeyes = 0, red = 0},
+        inspect = {curve = 0.12, width = 0.92, open = 0.04, eyeL = 1.25, eyeR = 0.7, pupil = 0.8, brow = 0.25, pitch = 0.05, xeyes = 0, red = 0},
+        smirk = {curve = 0.34, width = 1.0, open = 0.05, eyeL = 0.75, eyeR = 0.75, pupil = 1, brow = -0.15, pitch = 0, xeyes = 0, red = 0},
+        hurt = {curve = -0.05, width = 0.86, open = 0.3, eyeL = 1, eyeR = 1, pupil = 1, brow = 0.35, pitch = -0.3, xeyes = 1, red = 0},
+        evil = {curve = 0.42, width = 1.05, open = 0.14, eyeL = 0.95, eyeR = 0.95, pupil = 0.6, brow = -0.4, pitch = 0.05, xeyes = 0, red = 1},
+        dead = {curve = 0.05, width = 0.9, open = 0.0, eyeL = 1, eyeR = 1, pupil = 1, brow = 0, pitch = 0.5, xeyes = 1, red = 0},
+    }
+    local moodCur = {}
+    for k, v in pairs(MOODS.neutral) do moodCur[k] = v end
+    local moodTarget = MOODS.neutral
+
+    local function setDealerMoodFromText(txt)
+        local key = "neutral"
+        if txt:find("😵", 1, true) then key = "hurt"
+        elseif txt:find("😈", 1, true) then key = "evil"
+        elseif txt:find("🧐", 1, true) then key = "inspect"
+        elseif txt:find("😏", 1, true) then key = "smirk"
+        elseif txt:find("❌", 1, true) then key = "dead" end
+        moodTarget = MOODS[key]
+        if key == "dead" then
+            headBall.Color = Color3.fromRGB(88, 84, 82)
+        elseif key == "hurt" then
+            headBall.Color = Color3.fromRGB(205, 90, 80)
+            TweenService:Create(headBall, TweenInfo.new(0.7), {Color = SKIN}):Play()
+        else
+            headBall.Color = SKIN
+        end
+    end
+
+    local DealerFace = setmetatable({}, {
+        __newindex = function(_, key, value)
+            if key == "Text" then setDealerMoodFromText(tostring(value)) end
+        end
+    })
+
+    local blinkT, nextBlink = 0, 3
+    local function updateDealerFace(headCF)
+        local m = moodCur
+        local blinkK = (blinkT > 0) and 0.12 or 1
+        local isX = m.xeyes > 0.5
+        for i, e in ipairs(eyeSet) do
+            local sc = ((i == 1) and m.eyeL or m.eyeR) * blinkK
+            e.eye.Size = Vector3.new(0.5, 0.62 * math.max(0.05, sc), 0.2)
+            e.eye.CFrame = headCF * CFrame.new(0.36 * e.sgn, 0.18, 0.82)
+            e.eye.Color = Color3.fromRGB(3, 2, 2):Lerp(Color3.fromRGB(80, 0, 0), m.red)
+            e.eye.Transparency = isX and 1 or 0
+            e.pupil.CFrame = headCF * CFrame.new(0.36 * e.sgn, 0.18, 0.95)
+            e.x1.Transparency = isX and 0 or 1
+            e.x2.Transparency = isX and 0 or 1
+            e.x1.CFrame = headCF * CFrame.new(0.36 * e.sgn, 0.18, 0.95) * CFrame.Angles(0, 0, math.rad(45))
+            e.x2.CFrame = headCF * CFrame.new(0.36 * e.sgn, 0.18, 0.95) * CFrame.Angles(0, 0, math.rad(-45))
+            e.brow.CFrame = headCF * CFrame.new(0.36 * e.sgn, 0.62 + m.brow * 0.06, 0.82) * CFrame.Angles(0, 0, -e.sgn * m.brow * 0.6)
+        end
+        local halfW = 0.9 * m.width
+        local rise = m.curve * 1.2
+        local baseY = -0.4
+        local span = 2 * halfW / (MOUTH_N - 1)
+        local thT, thB = 0.24, 0.22
+        for i = 1, MOUTH_N do
+            local u = (i - (MOUTH_N + 1) / 2) / ((MOUTH_N - 1) / 2)
+            local mx = u * halfW
+            local my = baseY + rise * (u * u)
+            local inside = 1 - (mx / HR) ^ 2 - (my / HY) ^ 2
+            local zt = HR * math.sqrt(math.max(0.0016, inside)) + 0.02
+            local pos = Vector3.new(mx, my, zt)
+            local normal = Vector3.new(mx / (HR * HR), my / (HY * HY), zt / (HR * HR))
+            local face = CFrame.lookAt(pos, pos + normal)
+            local o = m.open
+            mouthBack[i].Size = Vector3.new(span * 1.12, o + thT + thB, 0.06)
+            mouthBack[i].CFrame = headCF * face * CFrame.new(0, 0, 0.03)
+            mouthTop[i].Size = Vector3.new(span * 0.86, thT, 0.08)
+            mouthTop[i].CFrame = headCF * face * CFrame.new(0, o * 0.5 + thT * 0.5 - 0.02, -0.03)
+            mouthBot[i].Size = Vector3.new(span * 0.86, thB, 0.08)
+            mouthBot[i].CFrame = headCF * face * CFrame.new(0, -o * 0.5 - thB * 0.5 + 0.02, -0.03)
+        end
+    end
+
+    -- ЧАСТИЦЫ (искры, осколки, вспышки)
+    local particles = {}
+    local function emit(pos, count, color, speed, life, size, grav)
+        for _ = 1, count do
+            if #particles > 140 then break end
+            local p = mk(WorldModel, "ball", Vector3.new(size, size, size), CFrame.new(pos), color, Enum.Material.Neon)
+            local dir = Vector3.new(math.random() - 0.5, math.random() * 0.9 + 0.25, math.random() - 0.5).Unit
+            local l = life * (0.6 + math.random() * 0.6)
+            table.insert(particles, {p = p, v = dir * (speed * (0.5 + math.random())), life = l, max = l, g = grav})
+        end
+    end
+-- КОНЕЦ ЧАСТИ 2В
+-- НАЧАЛО ЧАСТИ 2Г (интерфейс поверх 3D: виньетка, подписи HP, кнопки выстрела)
+    -- МУЗЫКА "General Release": экран трясётся в такт реальной громкости трека (PlaybackLoudness)
+    local MusicSound
+    if MUSIC_ID ~= "" then
+        MusicSound = Instance.new("Sound")
+        MusicSound.Name = "GeneralRelease"
+        MusicSound.SoundId = MUSIC_ID
+        MusicSound.Looped = true
+        MusicSound.Volume = MUSIC_VOLUME
+        MusicSound.Parent = ScreenGui
+        pcall(function() MusicSound:Play() end)
+    end
+    local musicEnv, musicKick = 0, 0
+
+    local function vignette(pos, size, rot)
+        local f = Instance.new("Frame", Viewport)
+        f.Position = pos
+        f.Size = size
+        f.BackgroundColor3 = Color3.new(0, 0, 0)
+        f.BorderSizePixel = 0
+        f.ZIndex = 2
+        local g = Instance.new("UIGradient", f)
+        g.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1)})
+        g.Rotation = rot
+    end
+    vignette(UDim2.new(0, 0, 0, 0), UDim2.new(0, 90, 1, 0), 0)
+    vignette(UDim2.new(1, -90, 0, 0), UDim2.new(0, 90, 1, 0), 180)
+    vignette(UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 36), 90)
+    vignette(UDim2.new(0, 0, 1, -36), UDim2.new(1, 0, 0, 36), -90)
+
+    -- СУБТИТРЫ внизу (как в оригинале) вместо журнала: чёрная плашка, печатающийся моно-шрифт
+    local SubFrame = Instance.new("Frame", Viewport)
+    SubFrame.AnchorPoint = Vector2.new(0.5, 1)
+    SubFrame.Position = UDim2.new(0.5, 0, 1, -10)
+    SubFrame.Size = UDim2.new(0.84, 0, 0, 0)
+    SubFrame.AutomaticSize = Enum.AutomaticSize.Y
+    SubFrame.BackgroundColor3 = Color3.new(0, 0, 0)
+    SubFrame.BackgroundTransparency = 0.04
+    SubFrame.BorderSizePixel = 0
+    SubFrame.ZIndex = 9
+    SubFrame.Visible = false
+    local subStroke = Instance.new("UIStroke", SubFrame)
+    subStroke.Color = Color3.fromRGB(90, 90, 80)
+    subStroke.Thickness = 1
+    local subPad = Instance.new("UIPadding", SubFrame)
+    subPad.PaddingTop = UDim.new(0, 7)
+    subPad.PaddingBottom = UDim.new(0, 7)
+    subPad.PaddingLeft = UDim.new(0, 12)
+    subPad.PaddingRight = UDim.new(0, 12)
+    local SubText = Instance.new("TextLabel", SubFrame)
+    SubText.Size = UDim2.new(1, 0, 0, 0)
+    SubText.AutomaticSize = Enum.AutomaticSize.Y
+    SubText.BackgroundTransparency = 1
+    SubText.Font = Enum.Font.Code
+    SubText.TextSize = 15
+    SubText.TextColor3 = Color3.fromRGB(238, 236, 222)
+    SubText.TextWrapped = true
+    SubText.RichText = true
+    SubText.TextXAlignment = Enum.TextXAlignment.Center
+    SubText.ZIndex = 10
+
+    local function stripEmoji(str)
+        str = str:gsub("—", "-"):gsub("–", "-")
+        str = str:gsub("[\240-\247][\128-\191]*", "")
+        str = str:gsub("[\224-\239][\128-\191][\128-\191]", "")
+        str = str:gsub("%s+", " ")
+        return (str:gsub("^%s+", ""):gsub("%s+$", ""))
+    end
+    local function upperRu(str)
+        return (str:gsub(utf8.charpattern, function(c)
+            local ok, cp = pcall(utf8.codepoint, c)
+            if not ok then return c end
+            if cp >= 0x430 and cp <= 0x44F then return utf8.char(cp - 32) end
+            if cp == 0x451 then return utf8.char(0x401) end
+            if cp < 128 then return c:upper() end
+            return c
+        end))
+    end
+
+    local subToken = 0
+    -- rich=true: текст уже готов (можно <font color=...>), startAt: сколько символов уже напечатано
+    local function subtitle(txt, color, rich, startAt)
+        subToken += 1
+        local my = subToken
+        local shown = rich and txt or upperRu(stripEmoji(txt))
+        local visible = shown:gsub("<[^>]->", "")
+        local n = utf8.len(visible) or #visible
+        SubText.TextColor3 = Color3.fromRGB(238, 236, 222):Lerp(color or Color3.fromRGB(238, 236, 222), 0.3)
+        SubText.Text = shown
+        SubText.TextTransparency = 0
+        SubFrame.BackgroundTransparency = 0.04
+        subStroke.Transparency = 0
+        SubText.MaxVisibleGraphemes = startAt or 0
+        SubFrame.Visible = true
+        task.spawn(function()
+            for i = (startAt or 0) + 1, n do
+                if my ~= subToken then return end
+                SubText.MaxVisibleGraphemes = i
+                task.wait(0.016)
+            end
+            SubText.MaxVisibleGraphemes = -1
+            task.wait(3.4 + n * 0.02)
+            if my ~= subToken then return end
+            TweenService:Create(SubText, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
+            TweenService:Create(SubFrame, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
+            TweenService:Create(subStroke, TweenInfo.new(0.5), {Transparency = 1}):Play()
+            task.wait(0.55)
+            if my == subToken then SubFrame.Visible = false end
+        end)
+    end
+
+    -- кнопка музыки в верхней панели
+    local MusicBtn = Instance.new("TextButton", TopBar)
+    MusicBtn.Size = UDim2.new(0, 28, 0, 24)
+    MusicBtn.Position = UDim2.new(1, -96, 0, 5)
+    MusicBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 46)
+    MusicBtn.Text = "M"
+    MusicBtn.TextColor3 = Color3.new(1, 1, 1)
+    MusicBtn.Font = Enum.Font.Code
+    Instance.new("UICorner", MusicBtn).CornerRadius = UDim.new(0, 4)
+    MusicBtn.MouseButton1Click:Connect(function()
+        if not MusicSound then
+            subtitle("Вставь ID трека General Release в переменную MUSIC_ID в начале скрипта", Color3.fromRGB(255, 210, 120))
+            return
+        end
+        if MusicSound.IsPlaying then
+            MusicSound:Pause()
+            MusicBtn.TextColor3 = Color3.fromRGB(120, 120, 120)
+        else
+            MusicSound:Resume()
+            MusicBtn.TextColor3 = Color3.new(1, 1, 1)
+        end
+    end)
+
+    local DealerHPLabel = Instance.new("TextLabel", Viewport)
+    DealerHPLabel.Size = UDim2.new(0, 170, 0, 20)
+    DealerHPLabel.Position = UDim2.new(0, 8, 0, 6)
+    DealerHPLabel.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+    DealerHPLabel.BackgroundTransparency = 0.45
+    DealerHPLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+    DealerHPLabel.Font = Enum.Font.Code
+    DealerHPLabel.TextSize = 13
+    DealerHPLabel.TextXAlignment = Enum.TextXAlignment.Left
+    DealerHPLabel.ZIndex = 6
+    Instance.new("UICorner", DealerHPLabel).CornerRadius = UDim.new(0, 4)
+    Instance.new("UIPadding", DealerHPLabel).PaddingLeft = UDim.new(0, 6)
+
+    local PlayerHPLabel = Instance.new("TextLabel", Viewport)
+    PlayerHPLabel.Size = UDim2.new(0, 170, 0, 20)
+    PlayerHPLabel.Position = UDim2.new(0, 8, 1, -88)
+    PlayerHPLabel.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+    PlayerHPLabel.BackgroundTransparency = 0.45
+    PlayerHPLabel.TextColor3 = Color3.fromRGB(85, 255, 130)
+    PlayerHPLabel.Font = Enum.Font.Code
+    PlayerHPLabel.TextSize = 13
+    PlayerHPLabel.TextXAlignment = Enum.TextXAlignment.Left
+    PlayerHPLabel.ZIndex = 6
+    Instance.new("UICorner", PlayerHPLabel).CornerRadius = UDim.new(0, 4)
+    Instance.new("UIPadding", PlayerHPLabel).PaddingLeft = UDim.new(0, 6)
+
+    local HoverTag = Instance.new("TextLabel", Viewport)
+    HoverTag.AnchorPoint = Vector2.new(0.5, 1)
+    HoverTag.Size = UDim2.new(0, 0, 0, 18)
+    HoverTag.AutomaticSize = Enum.AutomaticSize.X
+    HoverTag.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+    HoverTag.BackgroundTransparency = 0.25
+    HoverTag.TextColor3 = Color3.fromRGB(255, 235, 150)
+    HoverTag.Font = Enum.Font.Code
+    HoverTag.TextSize = 12
+    HoverTag.ZIndex = 12
+    HoverTag.Visible = false
+    Instance.new("UICorner", HoverTag).CornerRadius = UDim.new(0, 4)
+    local hoverPad = Instance.new("UIPadding", HoverTag)
+    hoverPad.PaddingLeft = UDim.new(0, 6)
+    hoverPad.PaddingRight = UDim.new(0, 6)
+
+    -- Подсказка предмета (вверху справа)
+    local TooltipLabel = Instance.new("TextLabel", Viewport)
+    TooltipLabel.AnchorPoint = Vector2.new(1, 0)
+    TooltipLabel.Size = UDim2.new(0, 240, 0, 44)
+    TooltipLabel.Position = UDim2.new(1, -8, 0, 6)
+    TooltipLabel.BackgroundTransparency = 1
+    TooltipLabel.Text = ""
+    TooltipLabel.TextColor3 = Color3.fromRGB(190, 210, 230)
+    TooltipLabel.Font = Enum.Font.Code
+    TooltipLabel.TextSize = 11
+    TooltipLabel.TextWrapped = true
+    TooltipLabel.TextXAlignment = Enum.TextXAlignment.Right
+    TooltipLabel.TextYAlignment = Enum.TextYAlignment.Top
+    TooltipLabel.ZIndex = 6
+
+    local ShootDealerBtn = Instance.new("TextButton", Content)
+    ShootDealerBtn.Size = UDim2.new(0.48, 0, 0, 42)
+    ShootDealerBtn.Position = UDim2.new(0, 0, 0, 252)
+    ShootDealerBtn.BackgroundColor3 = Color3.fromRGB(165, 35, 35)
+    ShootDealerBtn.Text = "🔫 ВЫСТРЕЛИТЬ В ДИЛЕРА"
+    ShootDealerBtn.TextColor3 = Color3.new(1, 1, 1)
+    ShootDealerBtn.Font = Enum.Font.Code
+    ShootDealerBtn.TextSize = 14
+    Instance.new("UICorner", ShootDealerBtn).CornerRadius = UDim.new(0, 6)
+
+    local ShootSelfBtn = Instance.new("TextButton", Content)
+    ShootSelfBtn.Size = UDim2.new(0.48, 0, 0, 42)
+    ShootSelfBtn.Position = UDim2.new(0.52, 0, 0, 252)
+    ShootSelfBtn.BackgroundColor3 = Color3.fromRGB(40, 95, 160)
+    ShootSelfBtn.Text = "🔫 ВЫСТРЕЛИТЬ В СЕБЯ"
+    ShootSelfBtn.TextColor3 = Color3.new(1, 1, 1)
+    ShootSelfBtn.Font = Enum.Font.Code
+    ShootSelfBtn.TextSize = 14
+    Instance.new("UICorner", ShootSelfBtn).CornerRadius = UDim.new(0, 6)
+-- КОНЕЦ ЧАСТИ 2Г (Вся Часть 2 готова!)
+-- НАЧАЛО ЧАСТИ 3А
+    local function muzzleWorld(sawed)
+        local z = (sawed and -1.5 or -2.2) * GUN_S
+        return (GunRoot.CFrame * CFrame.new(0, 0.1 * GUN_S, z)).Position
+    end
+
+    local function muzzleFlash(pos)
+        local f = mk(WorldModel, "ball", Vector3.new(0.5, 0.5, 0.5), CFrame.new(pos), Color3.fromRGB(255, 220, 120), Enum.Material.Neon)
+        task.spawn(function()
+            for i = 1, 6 do
+                local s = 0.5 + i * 0.35
+                f.Size = Vector3.new(s, s, s)
+                f.Transparency = i / 6
+                task.wait(0.02)
+            end
+            f:Destroy()
+        end)
+        emit(pos, 14, Color3.fromRGB(255, 190, 80), 9, 0.5, 0.1)
+    end
+
+    -- УДАР В ИГРОКА: белая вспышка -> резкая темнота -> звук разряда -> экран возвращается
+    local BlackOverlay = Instance.new("Frame", Viewport)
+    BlackOverlay.Size = UDim2.new(1, 0, 1, 0)
+    BlackOverlay.BackgroundColor3 = Color3.new(0, 0, 0)
+    BlackOverlay.BackgroundTransparency = 1
+    BlackOverlay.BorderSizePixel = 0
+    BlackOverlay.ZIndex = 30
+    BlackOverlay.Visible = false
+    local blackoutAt = 0
+
+    local function blackoutStart()
+        blackoutAt = os.clock()
+        BlackOverlay.Visible = true
+        BlackOverlay.BackgroundColor3 = Color3.new(1, 1, 1)
+        BlackOverlay.BackgroundTransparency = 0 -- последнее, что видно: вспышка
+        task.delay(0.07, function()
+            BlackOverlay.BackgroundColor3 = Color3.new(0, 0, 0) -- и мгновенно темнота
+        end)
+    end
+
+    local function blackoutEnd()
+        local rest = 1.5 - (os.clock() - blackoutAt)
+        if rest > 0 then task.wait(rest) end
+        playSFX(SOUNDS.Zap, 1.9)
+        playSFX(SOUNDS.Blank, 0.5)
+        shake = math.max(shake, 0.9)
+        task.wait(0.45)
+        TweenService:Create(BlackOverlay, TweenInfo.new(0.7), {BackgroundTransparency = 1}):Play()
+        task.wait(0.7)
+        BlackOverlay.Visible = false
+    end
+
+    local function animate3DGun(targetType, isLive, wasSawed)
+        local targetCF
+        if targetType == "Dealer" then
+            targetCF = CFrame.new(0, 1.0, -0.2) * CFrame.Angles(math.rad(8), 0, 0)
+        elseif targetType == "Player" then
+            targetCF = CFrame.new(0, 1.1, 0.5) * CFrame.Angles(math.rad(-12), math.rad(180), 0)
+        else
+            targetCF = CFrame.new(0, 0.55, 0) * CFrame.Angles(0, math.rad(90), 0)
+        end
+        gunSawedOverride = (wasSawed == true)
+
+        for _ = 1, 14 do
+            GunRoot.CFrame = GunRoot.CFrame:Lerp(targetCF, 0.28)
+            syncGunParts()
+            task.wait(0.02)
+        end
+
+        -- НАПРЯЖЁННАЯ ПАУЗА перед выстрелом: передёргивание затвора и лёгкое дрожание ствола
+        playSFX(SOUNDS.Rack, 0.75)
+        local holdStart = os.clock()
+        while os.clock() - holdStart < 1.6 do
+            local tt = os.clock() * 9
+            GunRoot.CFrame = targetCF * CFrame.new(math.sin(tt * 1.3) * 0.012, math.sin(tt) * 0.012, 0)
+                * CFrame.Angles(math.sin(tt * 0.8) * 0.012, math.sin(tt * 1.1) * 0.012, 0)
+            syncGunParts()
+            task.wait()
+        end
+        GunRoot.CFrame = targetCF
+        syncGunParts()
+
+        if isLive then
+            playSFX(SOUNDS.Shot, 0.95)
+            muzzleFlash(muzzleWorld(wasSawed))
+            shake = math.max(shake, 1.2)
+            FlashOverlay.BackgroundColor3 = Color3.fromRGB(255, 20, 20)
+            FlashOverlay.BackgroundTransparency = 0.3
+            TweenService:Create(FlashOverlay, TweenInfo.new(0.4), {BackgroundTransparency = 1}):Play()
+            GunRoot.CFrame = targetCF * CFrame.new(0, 0.25, 0.9) * CFrame.Angles(math.rad(22), 0, 0)
+            syncGunParts()
+            if targetType == "Player" then blackoutStart() end
+        else
+            playSFX(SOUNDS.Blank, 1.1)
+            emit(muzzleWorld(wasSawed), 6, Color3.fromRGB(150, 190, 255), 2.5, 0.5, 0.08)
+            FlashOverlay.BackgroundColor3 = Color3.fromRGB(100, 180, 255)
+            FlashOverlay.BackgroundTransparency = 0.75
+            TweenService:Create(FlashOverlay, TweenInfo.new(0.25), {BackgroundTransparency = 1}):Play()
+        end
+
+        task.wait(0.25)
+
+        local restCF = CFrame.new(0, 0.55, 0) * CFrame.Angles(0, math.rad(90), 0)
+        for _ = 1, 10 do
+            GunRoot.CFrame = GunRoot.CFrame:Lerp(restCF, 0.35)
+            syncGunParts()
+            task.wait(0.02)
+        end
+        gunSawedOverride = false
+        syncGunParts()
+    end
+
+    local function makeShellModel(isLive)
+        local m = newModel(WorldModel)
+        local col = isLive and Color3.fromRGB(215, 40, 40) or Color3.fromRGB(34, 34, 40)
+        mk(m, "cylY", Vector3.new(0.3, 0.62, 0.3), CFrame.new(0, 0.31, 0), col, Enum.Material.SmoothPlastic)
+        mk(m, "cylY", Vector3.new(0.32, 0.2, 0.32), CFrame.new(0, 0.1, 0), Color3.fromRGB(205, 165, 70), Enum.Material.Metal)
+        return m
+    end
+
+    -- Гильза вылетает из дробовика и падает на стол
+    local function spawn3DShell(isLive)
+        task.spawn(function()
+            local m = makeShellModel(isLive)
+            local start = Vector3.new(0.3, 1.0, 0.2)
+            local endPos = Vector3.new(math.random(-30, 30) / 10, 0.02, math.random(-5, 18) / 10)
+            local spin = math.random() * 6
+            for i = 1, 14 do
+                local t = i / 14
+                local arcY = math.sin(t * math.pi) * 1.6
+                local pos = start:Lerp(endPos, t) + Vector3.new(0, arcY, 0)
+                m:PivotTo(CFrame.new(pos) * CFrame.Angles(t * 9 + spin, spin, t * 7))
+                task.wait(0.025)
+            end
+            m:PivotTo(CFrame.new(endPos.X, 0.16, endPos.Z) * CFrame.Angles(0, spin, math.rad(90)))
+            task.wait(1.8)
+            m:Destroy()
+        end)
+    end
+
+    -- Показ обоймы на столе при зарядке (красные - боевые, синие - холостые), потом патроны летят в ствол
+    local function showShellsOnTable(liveCount, blankCount)
+        task.spawn(function()
+            local total = liveCount + blankCount
+            local shells = {}
+            for i = 1, total do
+                local m = makeShellModel(i <= liveCount)
+                local x = (i - (total + 1) / 2) * 0.62
+                m:PivotTo(CFrame.new(x, 4, 1.0) * CFrame.Angles(math.rad(90), 0, 0))
+                table.insert(shells, {m = m, x = x})
+                task.wait(0.05)
+            end
+            for _, s in ipairs(shells) do
+                for step = 1, 8 do
+                    local y = 4 + (0.16 - 4) * (step / 8) ^ 2
+                    s.m:PivotTo(CFrame.new(s.x, y, 1.0) * CFrame.Angles(math.rad(90), 0, 0))
+                    task.wait(0.01)
+                end
+                s.m:PivotTo(CFrame.new(s.x, 0.16, 1.0) * CFrame.Angles(math.rad(90), 0, 0))
+            end
+            task.wait(1.6)
+            for step = 1, 12 do
+                local a = step / 12
+                for _, s in ipairs(shells) do
+                    s.m:PivotTo(CFrame.new(Vector3.new(s.x, 0.16, 1.0):Lerp(Vector3.new(0, 0.9, 0), a) + Vector3.new(0, math.sin(a * math.pi) * 0.8, 0)) * CFrame.Angles(math.rad(90) * (1 - a), a * 6, 0))
+                end
+                task.wait(0.02)
+            end
+            for _, s in ipairs(shells) do s.m:Destroy() end
+        end)
+    end
+
+    local function setLog(mainText, color, subText)
+        subtitle(mainText, color)
+    end
+
+    local function ease(a) return a * a * (3 - 2 * a) end
+    local function runAnim(dur, fn)
+        local t0 = os.clock()
+        while true do
+            local a = math.min(1, (os.clock() - t0) / dur)
+            fn(a)
+            if a >= 1 then break end
+            task.wait()
+        end
+    end
+
+    -- ЛУПА: камера подъезжает к дробовику, из патронника поднимается патрон: красный = LIVE, чёрный = BLANK
+    local function showChamberCloseup(isLive)
+        camTarget = CFrame.lookAt(Vector3.new(1.1, 1.8, 2.4), Vector3.new(0.15, 0.8, 0))
+        playSFX(SOUNDS.Rack, 1.3)
+        task.wait(0.8)
+        local shell = makeShellModel(isLive)
+        local base = Vector3.new(0.27, 0.7, 0)
+        shell:PivotTo(CFrame.new(base))
+        local pre = "THIS SHOT IS..."
+        subtitle(pre, nil, true)
+        runAnim(0.7, function(a)
+            shell:PivotTo(CFrame.new(base + Vector3.new(0, ease(a) * 0.85, 0)) * CFrame.Angles(0, a * 3, 0))
+        end)
+        task.wait(0.9)
+        local word = isLive
+            and '<font color="rgb(255,55,55)">LIVE</font>'
+            or '<font color="rgb(150,150,165)">BLANK</font>'
+        subtitle(pre .. " " .. word, nil, true, utf8.len(pre))
+        if isLive then
+            playSFX(SOUNDS.Rack, 0.8)
+            FlashOverlay.BackgroundColor3 = Color3.fromRGB(255, 20, 20)
+            FlashOverlay.BackgroundTransparency = 0.7
+            TweenService:Create(FlashOverlay, TweenInfo.new(0.6), {BackgroundTransparency = 1}):Play()
+        else
+            playSFX(SOUNDS.Blank, 0.9)
+        end
+        task.wait(2.3)
+        runAnim(0.35, function(a)
+            shell:PivotTo(CFrame.new(base + Vector3.new(0, 0.85 * (1 - ease(a)), 0)))
+        end)
+        shell:Destroy()
+        camTarget = BASE_CAM
+        task.wait(0.6)
+    end
+
+    -- 3D-ЗДОРОВЬЕ: ячейки-заряды на столе (каждая ячейка = 1 HP)
+    local hpBanks = {
+        Player = {origin = PLAYER_BANK, color = Color3.fromRGB(70, 255, 130), cells = {}, strips = {}},
+        Dealer = {origin = DEALER_BANK, color = Color3.fromRGB(255, 70, 70), cells = {}, strips = {}},
+    }
+    local playerLabelPos, dealerLabelPos = PlayerHPLabel.Position, DealerHPLabel.Position
+
+    for _, bank in pairs(hpBanks) do
+        mk(WorldModel, "block", Vector3.new(2.3, 0.12, 2.0), CFrame.new(bank.origin + Vector3.new(0, 0.06, 0)), Color3.fromRGB(18, 18, 22), Enum.Material.Metal)
+        local o = bank.origin
+        table.insert(bank.strips, mk(WorldModel, "block", Vector3.new(2.3, 0.05, 0.07), CFrame.new(o + Vector3.new(0, 0.13, 1.0)), bank.color, Enum.Material.Neon))
+        table.insert(bank.strips, mk(WorldModel, "block", Vector3.new(2.3, 0.05, 0.07), CFrame.new(o + Vector3.new(0, 0.13, -1.0)), bank.color, Enum.Material.Neon))
+        table.insert(bank.strips, mk(WorldModel, "block", Vector3.new(0.07, 0.05, 2.0), CFrame.new(o + Vector3.new(1.15, 0.13, 0)), bank.color, Enum.Material.Neon))
+        table.insert(bank.strips, mk(WorldModel, "block", Vector3.new(0.07, 0.05, 2.0), CFrame.new(o + Vector3.new(-1.15, 0.13, 0)), bank.color, Enum.Material.Neon))
+    end
+
+    local function cellPos(bank, i, maxHp)
+        local col = (i - 1) % 3
+        local row = math.floor((i - 1) / 3)
+        local rows = math.ceil(maxHp / 3)
+        return bank.origin + Vector3.new((col - 1) * 0.75, 0.12, (row - (rows - 1) / 2) * 0.95)
+    end
+
+    local function styleCell(c, alive)
+        if alive then
+            c.core.Color = c.bank.color
+            c.core.Material = Enum.Material.Neon
+            c.core.Transparency = 0
+            for _, b in ipairs(c.bolts) do b.Transparency = 0 end
+        else
+            c.core.Color = Color3.fromRGB(45, 45, 50)
+            c.core.Material = Enum.Material.SmoothPlastic
+            c.core.Transparency = 0.2
+            for _, b in ipairs(c.bolts) do b.Transparency = 1 end
+        end
+    end
+
+    local function makeCell(bank, i, maxHp)
+        local m = newModel(WorldModel)
+        mk(m, "cylY", Vector3.new(0.58, 0.95, 0.58), CFrame.new(0, 0.475, 0), Color3.fromRGB(40, 50, 60), Enum.Material.Glass, 0.45)
+        local core = mk(m, "cylY", Vector3.new(0.4, 0.8, 0.4), CFrame.new(0, 0.47, 0), bank.color, Enum.Material.Neon)
+        mk(m, "cylY", Vector3.new(0.64, 0.12, 0.64), CFrame.new(0, 0.97, 0), Color3.fromRGB(30, 30, 34), Enum.Material.Metal)
+        mk(m, "cylY", Vector3.new(0.64, 0.12, 0.64), CFrame.new(0, 0.04, 0), Color3.fromRGB(30, 30, 34), Enum.Material.Metal)
+        local b1 = mk(m, "block", Vector3.new(0.12, 0.3, 0.05), CFrame.new(0.04, 0.58, 0.29) * CFrame.Angles(0, 0, math.rad(20)), Color3.new(1, 1, 1), Enum.Material.Neon)
+        local b2 = mk(m, "block", Vector3.new(0.12, 0.3, 0.05), CFrame.new(-0.04, 0.34, 0.29) * CFrame.Angles(0, 0, math.rad(20)), Color3.new(1, 1, 1), Enum.Material.Neon)
+        local pos = cellPos(bank, i, maxHp)
+        m:PivotTo(CFrame.new(pos))
+        return {m = m, core = core, bolts = {b1, b2}, alive = nil, pos = pos, idx = i, bank = bank}
+    end
+
+    local function breakCell(c)
+        emit(c.pos + Vector3.new(0, 0.5, 0), 16, c.bank.color, 6, 0.9, 0.13)
+        emit(c.pos + Vector3.new(0, 0.5, 0), 6, Color3.new(1, 1, 1), 4, 0.6, 0.09)
+        c.core.Color = Color3.new(1, 1, 1)
+        c.core.Transparency = 0
+        task.spawn(function()
+            for _ = 1, 8 do
+                c.m:PivotTo(CFrame.new(c.pos + Vector3.new((math.random() - 0.5) * 0.1, (math.random() - 0.5) * 0.1, 0)))
+                task.wait(0.025)
+            end
+            c.m:PivotTo(CFrame.new(c.pos))
+            if not c.alive then styleCell(c, false) end
+        end)
+    end
+
+    local function healCell(c)
+        styleCell(c, true)
+        emit(c.pos + Vector3.new(0, 0.5, 0), 10, Color3.fromRGB(120, 255, 170), 3, 0.8, 0.1)
+    end
+
+    local function lossFX(side, amount)
+        local isPlayerSide = (side == "Player")
+        shake = math.max(shake, isPlayerSide and 1.0 or 0.5)
+        FlashOverlay.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+        FlashOverlay.BackgroundTransparency = isPlayerSide and 0.45 or 0.8
+        TweenService:Create(FlashOverlay, TweenInfo.new(0.55), {BackgroundTransparency = 1}):Play()
+
+        local label = isPlayerSide and PlayerHPLabel or DealerHPLabel
+        local basePos = isPlayerSide and playerLabelPos or dealerLabelPos
+        local baseColor = isPlayerSide and Color3.fromRGB(85, 255, 130) or Color3.fromRGB(255, 80, 80)
+        label.TextColor3 = Color3.fromRGB(255, 0, 0)
+        label.TextSize = 20
+        TweenService:Create(label, TweenInfo.new(0.7, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {TextSize = 13, TextColor3 = baseColor}):Play()
+        task.spawn(function()
+            for _ = 1, 10 do
+                label.Position = UDim2.new(basePos.X.Scale, basePos.X.Offset + math.random(-6, 6), basePos.Y.Scale, basePos.Y.Offset + math.random(-4, 4))
+                task.wait(0.03)
+            end
+            label.Position = basePos
+        end)
+
+        local sx, sy = project(hpBanks[side].origin + Vector3.new(0, 1.6, 0))
+        local pop = Instance.new("TextLabel", Viewport)
+        pop.AnchorPoint = Vector2.new(0.5, 0.5)
+        pop.Size = UDim2.new(0, 110, 0, 34)
+        pop.Position = UDim2.new(sx, 0, sy, 0)
+        pop.BackgroundTransparency = 1
+        pop.Text = "-" .. amount .. " HP"
+        pop.TextColor3 = Color3.fromRGB(255, 40, 40)
+        pop.TextStrokeColor3 = Color3.new(0, 0, 0)
+        pop.TextStrokeTransparency = 0
+        pop.Font = Enum.Font.Code
+        pop.TextSize = 26
+        pop.ZIndex = 20
+        TweenService:Create(pop, TweenInfo.new(1.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Position = UDim2.new(sx, 0, sy - 0.22, 0),
+            TextTransparency = 1,
+            TextStrokeTransparency = 1
+        }):Play()
+        task.delay(1.2, function() if pop then pop:Destroy() end end)
+    end
+
+    local function updateHPUI()
+        for _, side in ipairs({"Player", "Dealer"}) do
+            local bank = hpBanks[side]
+            local hp = math.max(0, (side == "Player") and GameState.PlayerHP or GameState.DealerHP)
+            local maxHp = GameState.MaxHP
+            local rebuilt = false
+            if #bank.cells ~= maxHp then
+                for _, c in ipairs(bank.cells) do c.m:Destroy() end
+                bank.cells = {}
+                for i = 1, maxHp do bank.cells[i] = makeCell(bank, i, maxHp) end
+                rebuilt = true
+            end
+            local lost = 0
+            for i, c in ipairs(bank.cells) do
+                local alive = (i <= hp)
+                if c.alive ~= alive then
+                    if rebuilt or c.alive == nil then
+                        styleCell(c, alive)
+                    elseif alive then
+                        healCell(c)
+                    else
+                        breakCell(c)
+                        lost += 1
+                    end
+                    c.alive = alive
+                end
+            end
+            if lost > 0 then lossFX(side, lost) end
+            local label = (side == "Player") and PlayerHPLabel or DealerHPLabel
+            local name = (side == "Player") and "YOU    " or "MONSTER"
+            label.Text = name .. " ⚡ " .. hp .. "/" .. maxHp .. (hp == 0 and " 💀" or "")
+        end
+        syncGunParts()
+    end
+
+    local UseItem, DealerTurn
+
+    -- Можно ли применить предмет сейчас (правила настоящей Buckshot Roulette)
+    local function canUseItem(who, itemName)
+        local isPlayer = (who == "Player")
+        if itemName == "Handsaw" and GameState.SawActive then
+            return false, "ствол уже отпилен"
+        elseif itemName == "Handcuffs" then
+            if isPlayer and GameState.DealerCuffed then return false, "Дилер уже в наручниках" end
+            if (not isPlayer) and GameState.PlayerCuffed then return false, "ты уже в наручниках" end
+        elseif itemName == "Adrenaline" then
+            local targets = isPlayer and GameState.DealerItems or GameState.PlayerItems
+            local hasTarget = false
+            for _, n in ipairs(targets) do
+                if n ~= "Adrenaline" and canUseItem(who, n) then
+                    hasTarget = true
+                    break
+                end
+            end
+            if not hasTarget then return false, "у соперника нечего красть" end
+        end
+        return true
+    end
+-- КОНЕЦ ЧАСТИ 3А
+-- НАЧАЛО ЧАСТИ 3Б (3D-предметы)
+    local renderInventories
+    local displayed = {Player = {}, Dealer = {}}
+
+    -- Модели предметов: низ на уровне стола, примерно 1.3 единицы в ширину
+    local function buildItemModel(name, parent)
+        local m = newModel(parent)
+        local METAL = Enum.Material.Metal
+        if name == "Magnifying Glass" then
+            mk(m, "cylZ", Vector3.new(0.95, 0.95, 0.14), CFrame.new(0, 0.95, 0), Color3.fromRGB(120, 95, 40), METAL)
+            mk(m, "cylZ", Vector3.new(0.78, 0.78, 0.17), CFrame.new(0, 0.95, 0), Color3.fromRGB(150, 220, 255), Enum.Material.Glass, 0.5)
+            mk(m, "block", Vector3.new(0.15, 0.75, 0.15), CFrame.new(0.5, 0.35, 0) * CFrame.Angles(0, 0, math.rad(35)), Color3.fromRGB(60, 35, 20), Enum.Material.Wood)
+        elseif name == "Beer" then
+            mk(m, "cylY", Vector3.new(0.62, 1.0, 0.62), CFrame.new(0, 0.5, 0), Color3.fromRGB(215, 160, 30), METAL)
+            mk(m, "cylY", Vector3.new(0.64, 0.38, 0.64), CFrame.new(0, 0.5, 0), Color3.fromRGB(225, 225, 215))
+            mk(m, "cylY", Vector3.new(0.66, 0.2, 0.66), CFrame.new(0, 0.5, 0), Color3.fromRGB(200, 40, 40))
+            mk(m, "cylY", Vector3.new(0.66, 0.08, 0.66), CFrame.new(0, 1.0, 0), Color3.fromRGB(200, 200, 210), METAL)
+            mk(m, "cylY", Vector3.new(0.64, 0.06, 0.64), CFrame.new(0, 0.03, 0), Color3.fromRGB(200, 200, 210), METAL)
+        elseif name == "Handsaw" then
+            mk(m, "block", Vector3.new(1.3, 0.42, 0.05), CFrame.new(0.15, 0.6, 0) * CFrame.Angles(0, 0, math.rad(-8)), Color3.fromRGB(190, 195, 205), METAL)
+            for k = 0, 7 do
+                mk(m, "block", Vector3.new(0.09, 0.1, 0.06), CFrame.new(-0.35 + k * 0.17, 0.36 - k * 0.024, 0) * CFrame.Angles(0, 0, math.rad(45)), Color3.fromRGB(150, 155, 165), METAL)
+            end
+            mk(m, "block", Vector3.new(0.34, 0.62, 0.16), CFrame.new(-0.7, 0.62, 0), Color3.fromRGB(110, 60, 28), Enum.Material.Wood)
+            mk(m, "block", Vector3.new(0.14, 0.22, 0.18), CFrame.new(-0.7, 0.62, 0), Color3.fromRGB(20, 20, 20))
+        elseif name == "Handcuffs" then
+            for _, x in ipairs({-0.5, 0.5}) do
+                mk(m, "cylZ", Vector3.new(0.62, 0.62, 0.1), CFrame.new(x, 0.35, 0), Color3.fromRGB(200, 200, 210), METAL)
+                mk(m, "cylZ", Vector3.new(0.4, 0.4, 0.12), CFrame.new(x, 0.35, 0), Color3.fromRGB(26, 36, 30))
+            end
+            for k = -1, 1 do
+                mk(m, "block", Vector3.new(0.12, 0.09, 0.09), CFrame.new(k * 0.14, 0.35, 0), Color3.fromRGB(170, 170, 180), METAL)
+            end
+        elseif name == "Cigarettes" then
+            mk(m, "block", Vector3.new(0.7, 0.95, 0.3), CFrame.new(0, 0.48, 0), Color3.fromRGB(200, 30, 30))
+            mk(m, "block", Vector3.new(0.72, 0.3, 0.31), CFrame.new(0, 0.55, 0), Color3.fromRGB(235, 235, 235))
+            for _, x in ipairs({-0.18, 0, 0.18}) do
+                mk(m, "cylY", Vector3.new(0.11, 0.32, 0.11), CFrame.new(x, 1.1, 0), Color3.fromRGB(250, 250, 245))
+                mk(m, "cylY", Vector3.new(0.11, 0.1, 0.11), CFrame.new(x, 0.97, 0), Color3.fromRGB(230, 140, 40))
+            end
+        elseif name == "Inverter" then
+            mk(m, "block", Vector3.new(0.95, 0.6, 0.5), CFrame.new(0, 0.3, 0), Color3.fromRGB(45, 45, 52), METAL)
+            mk(m, "block", Vector3.new(0.12, 0.42, 0.12), CFrame.new(-0.25, 0.8, 0.12), Color3.fromRGB(255, 60, 60), Enum.Material.Neon)
+            mk(m, "block", Vector3.new(0.24, 0.24, 0.12), CFrame.new(-0.25, 1.08, 0.12) * CFrame.Angles(0, 0, math.rad(45)), Color3.fromRGB(255, 60, 60), Enum.Material.Neon)
+            mk(m, "block", Vector3.new(0.12, 0.42, 0.12), CFrame.new(0.25, 0.8, 0.12), Color3.fromRGB(70, 150, 255), Enum.Material.Neon)
+            mk(m, "block", Vector3.new(0.24, 0.24, 0.12), CFrame.new(0.25, 0.54, 0.12) * CFrame.Angles(0, 0, math.rad(45)), Color3.fromRGB(70, 150, 255), Enum.Material.Neon)
+        elseif name == "Burner Phone" then
+            mk(m, "block", Vector3.new(0.55, 1.0, 0.14), CFrame.new(0, 0.55, 0), Color3.fromRGB(32, 32, 38))
+            mk(m, "block", Vector3.new(0.42, 0.4, 0.03), CFrame.new(0, 0.8, 0.08), Color3.fromRGB(90, 255, 120), Enum.Material.Neon)
+            for r = 0, 1 do
+                for c = -1, 1 do
+                    mk(m, "block", Vector3.new(0.11, 0.08, 0.03), CFrame.new(c * 0.14, 0.42 - r * 0.13, 0.08), Color3.fromRGB(190, 190, 195))
+                end
+            end
+            mk(m, "cylY", Vector3.new(0.05, 0.35, 0.05), CFrame.new(0.2, 1.2, 0), Color3.fromRGB(150, 150, 155), METAL)
+        elseif name == "Expired Medicine" then
+            mk(m, "cylY", Vector3.new(0.55, 0.85, 0.55), CFrame.new(0, 0.43, 0), Color3.fromRGB(235, 120, 20), Enum.Material.Glass, 0.15)
+            mk(m, "cylY", Vector3.new(0.58, 0.18, 0.58), CFrame.new(0, 0.93, 0), Color3.fromRGB(245, 245, 245))
+            mk(m, "cylY", Vector3.new(0.565, 0.35, 0.565), CFrame.new(0, 0.45, 0), Color3.fromRGB(245, 245, 245))
+            mk(m, "block", Vector3.new(0.2, 0.06, 0.02), CFrame.new(0, 0.45, 0.29), Color3.fromRGB(255, 40, 40), Enum.Material.Neon)
+            mk(m, "block", Vector3.new(0.06, 0.2, 0.02), CFrame.new(0, 0.45, 0.29), Color3.fromRGB(255, 40, 40), Enum.Material.Neon)
+        elseif name == "Adrenaline" then
+            mk(m, "cyl", Vector3.new(0.9, 0.34, 0.34), CFrame.new(0, 0.27, 0), Color3.fromRGB(220, 240, 255), Enum.Material.Glass, 0.5)
+            mk(m, "cyl", Vector3.new(0.6, 0.26, 0.26), CFrame.new(-0.05, 0.27, 0), Color3.fromRGB(255, 230, 60), Enum.Material.Neon)
+            mk(m, "cyl", Vector3.new(0.4, 0.1, 0.1), CFrame.new(0.65, 0.27, 0), Color3.fromRGB(200, 200, 210), METAL)
+            mk(m, "cyl", Vector3.new(0.06, 0.34, 0.34), CFrame.new(0.88, 0.27, 0), Color3.fromRGB(200, 200, 210), METAL)
+            mk(m, "block", Vector3.new(0.06, 0.5, 0.14), CFrame.new(0.42, 0.27, 0), Color3.fromRGB(200, 200, 210), METAL)
+            mk(m, "cyl", Vector3.new(0.45, 0.05, 0.05), CFrame.new(-0.67, 0.27, 0), Color3.fromRGB(215, 215, 225), METAL)
+        end
+        local halo = mk(m, "cylY", Vector3.new(1.7, 0.04, 1.7), CFrame.new(0, 0.02, 0), Color3.fromRGB(255, 210, 60), Enum.Material.Neon, 1)
+        halo.Name = "Halo"
+        return m
+    end
+
+    local function slotPos(side, idx, n)
+        local z = (side == "Player") and PLAYER_ITEM_Z or DEALER_ITEM_Z
+        return Vector3.new((idx - (n + 1) / 2) * ITEM_SPACING, 0, z)
+    end
+
+    local function indexOf(list, it)
+        for i, o in ipairs(list) do
+            if o == it then return i end
+        end
+        return nil
+    end
+
+    -- Клик по 3D-предмету (кнопка невидимо лежит поверх предмета)
+    local function onItemClick(it)
+        local info = ITEMS_DB[it.name]
+        local idx = indexOf(displayed[it.side], it)
+        if not idx then return end
+        TooltipLabel.Text = "[" .. info.Short .. "]: " .. info.Desc
+
+        if it.side == "Player" then
+            if GameState.PlayerItems[idx] ~= it.name then return end
+            if GameState.Turn == "Player" and not GameState.GameOver and not GameState.StealingMode and not GameState.Busy then
+                local ok, reason = canUseItem("Player", it.name)
+                if not ok then
+                    setLog("⛔ " .. info.Short .. ": " .. reason, Color3.fromRGB(255, 90, 90))
+                    addSideLog("⛔ " .. info.Icon .. " " .. info.Short .. " нельзя применить: " .. reason, Color3.fromRGB(255, 90, 90))
+                    return
+                end
+                GameState.Busy = true
+                table.remove(GameState.PlayerItems, idx)
+                renderInventories()
+                UseItem("Player", it.name)
+                GameState.Busy = false
+            end
+        else
+            if GameState.DealerItems[idx] ~= it.name then return end
+            if GameState.StealingMode and GameState.Turn == "Player" and not GameState.Busy then
+                if it.name == "Adrenaline" then
+                    setLog("Нельзя украсть Адреналин!", Color3.fromRGB(255, 90, 90))
+                    addSideLog("⛔ Адреналин украсть нельзя", Color3.fromRGB(255, 90, 90))
+                    return
+                end
+                local ok, reason = canUseItem("Player", it.name)
+                if not ok then
+                    setLog("⛔ " .. info.Short .. ": " .. reason, Color3.fromRGB(255, 90, 90))
+                    addSideLog("⛔ Нельзя украсть " .. info.Icon .. " " .. info.Short .. ": " .. reason, Color3.fromRGB(255, 90, 90))
+                    return
+                end
+                GameState.StealingMode = false
+                GameState.Busy = true
+                table.remove(GameState.DealerItems, idx)
+                renderInventories()
+                setLog("💉 УКРАДЕН ПРЕДМЕТ: " .. info.Short .. "!", Color3.fromRGB(255, 220, 80))
+                addSideLog("💉 ТЫ украл у Дилера " .. info.Icon .. " " .. info.Short, Color3.fromRGB(255, 220, 80))
+                task.wait(0.5)
+                UseItem("Player", it.name)
+                GameState.Busy = false
+            end
+        end
+    end
+
+    local LAY = math.rad(-90)
+    local ITEM_BAKE = {
+        ["Magnifying Glass"] = CFrame.new(0, 0.09, 0.55) * CFrame.Angles(LAY, 0, 0),
+        ["Handsaw"] = CFrame.new(0, 0.08, 0.6) * CFrame.Angles(LAY, 0, 0),
+        ["Handcuffs"] = CFrame.new(0, 0.06, 0.35) * CFrame.Angles(LAY, 0, 0),
+        ["Cigarettes"] = CFrame.new(0, 0.155, 0.55) * CFrame.Angles(LAY, 0, 0),
+        ["Burner Phone"] = CFrame.new(0, 0.07, 0.6) * CFrame.Angles(LAY, 0, 0),
+    }
+
+    local function createItem(side, name)
+        local m = buildItemModel(name, WorldModel)
+        local parts, halo = {}, nil
+        for _, p in ipairs(m:GetChildren()) do
+            if p:IsA("BasePart") and p.Name ~= "Root" then
+                if p.Name == "Halo" then
+                    halo = p
+                else
+                    table.insert(parts, {p = p, t = p.Transparency})
+                end
+            end
+        end
+        -- плоские предметы укладываем на стол (запекаем поворот в детали модели)
+        local bake = ITEM_BAKE[name] or CFrame.new()
+        if ITEM_BAKE[name] then
+            for _, e in ipairs(parts) do e.p.CFrame = bake * e.p.CFrame end
+        end
+        local it = {name = name, side = side, model = m, parts = parts, halo = halo, pos = Vector3.new(0, 4, 0),
+            target = Vector3.new(0, 0, 0), lift = 0, hover = false, phase = math.random() * 6.28,
+            bake = bake, bakeInv = bake:Inverse(), yaw = (math.random() - 0.5) * 0.5, vy = 0, thud = false}
+
+        local btn = Instance.new("TextButton")
+        btn.AnchorPoint = Vector2.new(0.5, 0.5)
+        btn.BackgroundTransparency = 1
+        btn.Text = ""
+        btn.AutoButtonColor = false
+        btn.ZIndex = 10
+        btn.Size = UDim2.fromOffset(40, 40)
+        btn.Parent = Viewport
+        it.btn = btn
+        btn.MouseEnter:Connect(function()
+            it.hover = true
+            local info = ITEMS_DB[name]
+            TooltipLabel.Text = ((side == "Dealer") and "[Дилер - " or "[") .. info.Short .. "]: " .. info.Desc
+        end)
+        btn.MouseLeave:Connect(function() it.hover = false; TooltipLabel.Text = "" end)
+        btn.MouseButton1Click:Connect(function() onItemClick(it) end)
+        return it
+    end
+
+    -- АНИМАЦИИ ПРЕДМЕТОВ: у каждого предмета своя при использовании
+    local function removeItem(it)
+        if it.btn then it.btn:Destroy() end
+        it.hover = false
+        task.spawn(function()
+            local sd = (it.side == "Player") and 1 or -1
+            local faceYaw = (sd < 0) and math.pi or 0
+            local cur = CFrame.new(it.pos) * CFrame.Angles(0, it.yaw, 0) * it.bake -- поза в "стоячем" виде модели
+            local function pose(cf) it.model:PivotTo(cf * it.bakeInv) end
+            local function moveTo(target, dur, arc)
+                local from = cur
+                runAnim(dur, function(a)
+                    local cf = from:Lerp(target, ease(a))
+                    if arc then cf = cf + Vector3.new(0, math.sin(a * math.pi) * arc, 0) end
+                    pose(cf)
+                end)
+                cur = target
+            end
+            local function fade(dur)
+                runAnim(dur, function(a)
+                    for _, e in ipairs(it.parts) do e.p.Transparency = e.t + (1 - e.t) * a end
+                end)
+            end
+            local stage = CFrame.new(0, 1.8, sd * 0.9) * CFrame.Angles(0, faceYaw, 0)
+            local name = it.name
+
+            local function body()
+                if name == "Magnifying Glass" then
+                    playSFX(SOUNDS.Rack, 1.5)
+                    moveTo(stage * CFrame.Angles(math.rad(-15), 0, math.rad(8)), 0.45, 0.5)
+                    local base = cur
+                    runAnim(1.0, function(a)
+                        pose(base * CFrame.new(math.sin(a * math.pi * 2) * 0.8, 0, 0) * CFrame.Angles(0, 0, math.sin(a * math.pi * 2) * 0.15))
+                    end)
+                    emit((base * CFrame.new(0, 0.95, 0.1)).Position, 6, Color3.fromRGB(190, 235, 255), 2, 0.5, 0.07)
+
+                elseif name == "Beer" then
+                    moveTo(CFrame.new(0.9, 1.4, sd * 0.8), 0.45, 0.6)
+                    playSFX(SOUNDS.Blank, 2.0) -- "пшшш" открытой банки
+                    local base = cur
+                    runAnim(1.0, function(a)
+                        local tilt = ease(math.min(1, a * 1.6)) * math.rad(115)
+                        local cf = base * CFrame.Angles(0, 0, tilt)
+                        pose(cf)
+                        if a > 0.3 and math.random() < 0.6 then
+                            local mouth = (cf * CFrame.new(0, 1.0, 0)).Position
+                            emit(mouth, 1, (math.random() < 0.5) and Color3.fromRGB(245, 240, 215) or Color3.fromRGB(230, 170, 40), 0.8, 0.7, 0.09, -9)
+                        end
+                    end)
+
+                elseif name == "Handsaw" then
+                    moveTo(CFrame.new(-1.9, 1.5, 0) * CFrame.Angles(0, math.pi / 2, 0), 0.5, 0.5)
+                    moveTo(CFrame.new(-1.9, 0.56, 0) * CFrame.Angles(0, math.pi / 2, 0), 0.2)
+                    playSFX(SOUNDS.Saw, 1.0)
+                    local base = cur
+                    runAnim(1.3, function(a)
+                        local off = math.sin(a * math.pi * 9) * 0.45
+                        pose(base * CFrame.new(off, 0, 0))
+                        if math.random() < 0.7 then
+                            emit(Vector3.new(-1.9, 0.82, -off), 2, Color3.fromRGB(255, 200, 90), 3, 0.35, 0.05)
+                        end
+                    end)
+                    moveTo(base + Vector3.new(0, 1.0, 0), 0.3)
+
+                elseif name == "Handcuffs" then
+                    playSFX(SOUNDS.Rack, 0.9)
+                    moveTo(CFrame.new(0, 1.5, sd * 0.8) * CFrame.Angles(0, faceYaw, 0), 0.4, 0.4)
+                    local tgt = (sd > 0) and Vector3.new(0, 0.9, -2.5) or Vector3.new(0, 0.9, 4.6)
+                    moveTo(CFrame.new(tgt) * CFrame.Angles(0, faceYaw, 0), 0.5, 0.8)
+                    local base = cur
+                    for _ = 1, 3 do
+                        playSFX(SOUNDS.Rack, 1.9)
+                        emit(tgt, 5, Color3.fromRGB(220, 220, 235), 3, 0.3, 0.05)
+                        runAnim(0.12, function(a) pose(base * CFrame.new(0, -0.08 * math.sin(a * math.pi), 0)) end)
+                    end
+
+                elseif name == "Cigarettes" then
+                    moveTo(CFrame.new(0.5, 1.5, sd * 0.8) * CFrame.Angles(0, faceYaw, math.rad(-22)), 0.5, 0.5)
+                    local base = cur
+                    emit((base * CFrame.new(0, 1.25, 0)).Position, 5, Color3.fromRGB(255, 130, 40), 1.5, 0.4, 0.06, 0)
+                    runAnim(1.4, function(a)
+                        pose(base * CFrame.new(0, math.sin(a * math.pi * 3) * 0.05, 0))
+                        if math.random() < 0.55 then
+                            emit((base * CFrame.new(0, 1.3, 0)).Position, 1, Color3.fromRGB(170, 170, 170), 0.5, 1.1, 0.13, 1.4)
+                        end
+                    end)
+
+                elseif name == "Inverter" then
+                    moveTo(stage, 0.45, 0.5)
+                    local base = cur
+                    playSFX(SOUNDS.Blank, 1.5)
+                    runAnim(0.9, function(a)
+                        pose(base * CFrame.new(0, 0.3, 0) * CFrame.Angles(0, 0, ease(a) * math.pi * 2) * CFrame.new(0, -0.3, 0))
+                        if math.random() < 0.5 then
+                            emit((base * CFrame.new(0, 0.5, 0)).Position, 2, (math.random() < 0.5) and Color3.fromRGB(255, 80, 80) or Color3.fromRGB(80, 160, 255), 3, 0.35, 0.06)
+                        end
+                    end)
+
+                elseif name == "Burner Phone" then
+                    moveTo(stage * CFrame.Angles(math.rad(-10), 0, 0), 0.45, 0.5)
+                    local base = cur
+                    playSFX(SOUNDS.Blank, 1.8)
+                    runAnim(1.1, function(a)
+                        pose(base * CFrame.new((math.random() - 0.5) * 0.05, (math.random() - 0.5) * 0.05, 0) * CFrame.Angles(0, 0, (math.random() - 0.5) * 0.08))
+                        if math.random() < 0.25 then
+                            emit((base * CFrame.new(0, 0.8, 0.1)).Position, 1, Color3.fromRGB(100, 255, 140), 1.5, 0.4, 0.05, 0)
+                        end
+                    end)
+
+                elseif name == "Expired Medicine" then
+                    moveTo(stage, 0.45, 0.5)
+                    local base = cur
+                    runAnim(0.7, function(a)
+                        pose(base * CFrame.new(0, 0.4, 0) * CFrame.Angles((math.random() - 0.5) * 0.25, 0, (math.random() - 0.5) * 0.25) * CFrame.new(0, -0.4, 0))
+                    end)
+                    playSFX(SOUNDS.Blank, 1.4)
+                    local top = (base * CFrame.new(0, 0.95, 0)).Position
+                    emit(top, 8, Color3.fromRGB(245, 245, 245), 4, 0.9, 0.08)
+                    emit(top, 6, Color3.fromRGB(235, 120, 20), 4, 0.9, 0.08)
+                    runAnim(0.4, function(a) pose(base * CFrame.new(0, 0.4, 0) * CFrame.Angles(0, 0, math.sin(a * math.pi) * 0.5) * CFrame.new(0, -0.4, 0)) end)
+
+                elseif name == "Adrenaline" then
+                    -- шприц летит к игроку (к зрителю) или к Дилеру и колет в тело, а не в стол
+                    local dirYaw = (sd > 0) and -math.pi / 2 or math.pi / 2
+                    local aim = CFrame.new(0, 2.6, sd * 3.6) * CFrame.Angles(0, dirYaw, 0) * CFrame.Angles(0, 0, math.rad(-15))
+                    moveTo(aim, 0.5, 0.6)
+                    task.wait(0.3)
+                    local stab = aim + Vector3.new(0, -0.3, sd * 1.3)
+                    moveTo(stab, 0.1)
+                    playSFX(SOUNDS.Heal, 1.4)
+                    emit((stab * CFrame.new(0.9, 0, 0)).Position, 14, Color3.fromRGB(255, 235, 80), 4, 0.7, 0.08)
+                    shake = math.max(shake, 0.5)
+                    if sd > 0 then
+                        FlashOverlay.BackgroundColor3 = Color3.fromRGB(255, 230, 90)
+                        FlashOverlay.BackgroundTransparency = 0.55
+                        TweenService:Create(FlashOverlay, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
+                    end
+                    task.wait(0.35)
+
+                else
+                    local start = it.pos
+                    local center = Vector3.new(0, 2.6, sd * 0.6)
+                    runAnim(0.35, function(a)
+                        pose(CFrame.new(start:Lerp(center, ease(a)) + Vector3.new(0, math.sin(a * math.pi) * 0.6, 0)) * CFrame.Angles(0, a * 8, a * 2) * it.bake)
+                    end)
+                end
+            end
+
+            local ok, err = pcall(body)
+            if not ok then warn("[BloxRoulette] item anim: " .. tostring(err)) end
+            emit(cur.Position + Vector3.new(0, 0.4, 0), 10, Color3.fromRGB(255, 235, 150), 4, 0.6, 0.09)
+            pcall(fade, 0.25)
+            it.model:Destroy()
+        end)
+    end
+
+    -- Сопоставляет списки предметов из игры с 3D-моделями: новые падают на стол, использованные улетают
+    local function reconcile(side, list)
+        local pool = {}
+        for _, it in ipairs(displayed[side]) do
+            pool[it.name] = pool[it.name] or {}
+            table.insert(pool[it.name], it)
+        end
+        local newList = {}
+        local fresh = 0
+        for idx, name in ipairs(list) do
+            local q = pool[name]
+            local it
+            if q and #q > 0 then
+                it = table.remove(q, 1)
+                it.target = slotPos(side, idx, #list)
+            else
+                it = createItem(side, name)
+                it.target = slotPos(side, idx, #list)
+                it.pos = it.target + Vector3.new(0, 4.5, 0)
+                fresh += 1
+            end
+            table.insert(newList, it)
+        end
+        for _, q in pairs(pool) do
+            for _, it in ipairs(q) do removeItem(it) end
+        end
+        displayed[side] = newList
+        if fresh > 0 then playSFX(SOUNDS.Rack, 1.6) end
+    end
+
+    renderInventories = function()
+        reconcile("Player", GameState.PlayerItems)
+        reconcile("Dealer", GameState.DealerItems)
+    end
+
+    local function giveFairItems(count)
+        local pSpace = 4 - #GameState.PlayerItems
+        local dSpace = 4 - #GameState.DealerItems
+        local actualGive = math.min(count, pSpace, dSpace)
+
+        for _ = 1, actualGive do
+            table.insert(GameState.PlayerItems, ITEM_NAMES[math.random(1, #ITEM_NAMES)])
+            table.insert(GameState.DealerItems, ITEM_NAMES[math.random(1, #ITEM_NAMES)])
+        end
+        return actualGive
+    end
+
+    local function loadShotgun()
+        playSFX(SOUNDS.Rack, 1.0)
+        GameState.Shells = {}
+        GameState.SawActive = false
+        local total = math.random(3, 8)
+        local liveCount = math.clamp(math.floor(total / 2) + math.random(0, 1), 1, total - 1)
+        local blankCount = total - liveCount
+
+        for _ = 1, liveCount do table.insert(GameState.Shells, true) end
+        for _ = 1, blankCount do table.insert(GameState.Shells, false) end
+
+        for i = #GameState.Shells, 2, -1 do
+            local j = math.random(1, i)
+            GameState.Shells[i], GameState.Shells[j] = GameState.Shells[j], GameState.Shells[i]
+        end
+
+        local given = giveFairItems(math.random(2, 4))
+
+        GunRoot.CFrame = CFrame.new(0, 0.55, 0) * CFrame.Angles(0, math.rad(90), 0)
+        DealerFace.Text = "[ 👁️ _ 👁️ ]"
+        renderInventories()
+        updateHPUI()
+        showShellsOnTable(liveCount, blankCount)
+        setLog(
+            string.format("🔄 ОБОЙМА: 🔴 %d БОЕВЫХ  |  🔵 %d ХОЛОСТЫХ", liveCount, blankCount),
+            Color3.fromRGB(255, 215, 90),
+            string.format("Раунд %d/3. Выдано по %d предмета (лимит 4). Твой ход!", GameState.Round, given)
+        )
+        addSideLog(
+            string.format("🔄 ОБОЙМА (раунд %d/3)\n🔴 боевых: %d, 🔵 холостых: %d\nВыдано предметов: по %d", GameState.Round, liveCount, blankCount, given),
+            Color3.fromRGB(255, 215, 90)
+        )
+    end
+
+    -- ГЛАВНЫЙ ЦИКЛ АНИМАЦИИ (Дилер дышит, предметы парят, заряды пульсируют, частицы летят)
+    local clock0 = os.clock()
+    local lastCuffed, playerCuffModel = nil, nil
+    local function step(dt)
+        local t = os.clock() - clock0
+
+        camCur = camCur:Lerp(camTarget, math.min(1, dt * 5))
+        local ox, oy, roll = 0, 0, 0
+        if shake > 0 then
+            local s = shake * 0.18
+            ox, oy = (math.random() - 0.5) * s, (math.random() - 0.5) * s
+            shake = math.max(0, shake - dt * 2.2)
+        end
+        -- лёгкая тряска экрана от музыки: берём громкость трека, ловим удар (резкий скачок над средним уровнем)
+        if MusicSound and MusicSound.IsPlaying and MUSIC_SHAKE > 0 then
+            local loud = MusicSound.PlaybackLoudness
+            musicEnv += (loud - musicEnv) * math.min(1, dt * 10)
+            local kick = math.clamp((loud - musicEnv * 0.9) / 260, 0, 1)
+            musicKick = math.max(musicKick * math.max(0, 1 - dt * 9), kick)
+            local amp = (math.clamp(musicEnv / 600, 0, 1) * 0.35 + musicKick * 0.65) * MUSIC_SHAKE
+            local ms = amp * 0.12
+            ox += (math.random() - 0.5) * ms
+            oy += (math.random() - 0.5) * ms * 1.3
+            roll = (math.random() - 0.5) * amp * 0.006
+        end
+        Camera.CFrame = camCur * CFrame.new(ox, oy, 0) * CFrame.Angles(0, 0, roll)
+
+        local bob = math.sin(t * 1.6) * 0.05
+        for i, L in ipairs(FX.lamps) do
+            local blink = (math.noise(t * 1.4, i * 7.3) > 0.32) and (0.5 + 0.5 * math.sin(t * 60 + i)) or 1
+            L.p.Transparency = L.base + (1 - L.base) * (1 - blink)
+        end
+        for _, d in ipairs(FX.dust) do
+            local yy = (d.y + t * 0.12) % 6
+            d.p.CFrame = CFrame.new(d.x + math.sin(t * 0.4 + d.ph) * 0.5, yy, d.z + math.cos(t * 0.3 + d.ph) * 0.5)
+        end
+        local twitch = (math.noise(t * 7, 1.3) > 0.28) and math.noise(t * 35, 2.1) * 0.22 or 0
+        DealerBody:PivotTo(CFrame.new(0, bob, DEALER_Z))
+        local a = math.min(1, dt * 8)
+        for k, v in pairs(moodTarget) do moodCur[k] = moodCur[k] + (v - moodCur[k]) * a end
+        blinkT = math.max(0, blinkT - dt)
+        nextBlink -= dt
+        if nextBlink <= 0 then
+            blinkT = 0.12
+            nextBlink = 2 + math.random() * 3
+        end
+        local headCF = CFrame.new(0, 3.55 + bob * 1.4, DEALER_Z + 0.05)
+            * CFrame.Angles(moodCur.pitch + math.sin(t * 0.6) * 0.03, math.sin(t * 0.5) * 0.12 + twitch, math.sin(t * 0.8) * 0.03 + twitch * 0.5)
+        DealerHead:PivotTo(headCF)
+        updateDealerFace(headCF)
+
+        if lastCuffed ~= GameState.DealerCuffed then
+            lastCuffed = GameState.DealerCuffed
+            for _, p in ipairs(cuffParts) do p.Transparency = lastCuffed and 0 or 1 end
+        end
+        if GameState.PlayerCuffed then
+            if not playerCuffModel then playerCuffModel = buildItemModel("Handcuffs", WorldModel) end
+            playerCuffModel:PivotTo(CFrame.new(0, 0.05, 4.7))
+        elseif playerCuffModel then
+            playerCuffModel:PivotTo(CFrame.new(0, -100, 0))
+        end
+
+        local hoveredIt, hx, hy = nil, 0, 0
+        for _, side in ipairs({"Player", "Dealer"}) do
+            for _, it in ipairs(displayed[side]) do
+                -- по столу предметы скользят, по высоте падают под гравитацией и отскакивают (никакого парения)
+                local k = math.min(1, dt * 7)
+                local px = it.pos.X + (it.target.X - it.pos.X) * k
+                local pz = it.pos.Z + (it.target.Z - it.pos.Z) * k
+                it.vy -= 28 * dt
+                local py = it.pos.Y + it.vy * dt
+                if py <= it.target.Y then
+                    py = it.target.Y
+                    if it.vy < -3 then
+                        if not it.thud then
+                            it.thud = true
+                            playSFX(SOUNDS.Rack, 0.55)
+                        end
+                        it.vy = -it.vy * 0.28
+                    else
+                        it.vy = 0
+                    end
+                end
+                it.pos = Vector3.new(px, py, pz)
+                it.lift += ((it.hover and 0.1 or 0) - it.lift) * math.min(1, dt * 12)
+                it.model:PivotTo(CFrame.new(it.pos + Vector3.new(0, it.lift, 0)) * CFrame.Angles(0, it.yaw, 0))
+                if it.halo then
+                    local steal = (GameState.StealingMode and side == "Dealer")
+                    it.halo.Transparency = steal and (0.35 + 0.25 * math.sin(t * 7)) or 1
+                end
+                local sx, sy, ppu = project(it.pos + Vector3.new(0, 0.5 + it.lift, 0))
+                it.btn.Position = UDim2.fromScale(sx, sy)
+                local sz = math.clamp(ppu * 1.5, 30, 54)
+                it.btn.Size = UDim2.fromOffset(sz, sz)
+                if it.hover then hoveredIt, hx, hy = it, sx, sy end
+            end
+        end
+        if hoveredIt then
+            local info = ITEMS_DB[hoveredIt.name]
+            HoverTag.Text = info.Icon .. " " .. info.Short
+            HoverTag.Position = UDim2.new(hx, 0, hy, -30)
+            HoverTag.Visible = true
+        else
+            HoverTag.Visible = false
+        end
+
+        for side, bank in pairs(hpBanks) do
+            local active = (GameState.Turn == side) and not GameState.GameOver
+            local stripT = active and (0.05 + 0.2 * (0.5 + 0.5 * math.sin(t * 4))) or 0.8
+            for _, s in ipairs(bank.strips) do s.Transparency = stripT end
+            for _, c in ipairs(bank.cells) do
+                if c.alive then c.core.Transparency = 0.04 + 0.1 * (0.5 + 0.5 * math.sin(t * 3 + c.idx)) end
+            end
+        end
+
+        for i = #particles, 1, -1 do
+            local q = particles[i]
+            q.life -= dt
+            if q.life <= 0 then
+                q.p:Destroy()
+                table.remove(particles, i)
+            else
+                q.v += Vector3.new(0, q.g or -9, 0) * dt
+                q.p.Position = q.p.Position + q.v * dt
+                q.p.Transparency = 1 - math.clamp(q.life / q.max, 0, 1)
+            end
+        end
+    end
+
+    local stepWarned = false
+    local stepConn = RunService.Heartbeat:Connect(function(dt)
+        local ok, err = pcall(step, dt)
+        if not ok and not stepWarned then
+            stepWarned = true
+            warn("[BloxRoulette] " .. tostring(err))
+        end
+    end)
+    MainFrame.Destroying:Connect(function()
+        stepConn:Disconnect()
+        if MusicSound then MusicSound:Destroy() end
+    end)
+-- КОНЕЦ ЧАСТИ 3Б
+-- НАЧАЛО ЧАСТИ 3В
+    local function startNewGame()
+        GameState.Round = 1
+        GameState.MaxHP = math.random(3, 5)
+        GameState.PlayerHP = GameState.MaxHP
+        GameState.DealerHP = GameState.MaxHP
+        GameState.PlayerItems = {}
+        GameState.DealerItems = {}
+        GameState.Turn = "Player"
+        GameState.DealerCuffed = false
+        GameState.PlayerCuffed = false
+        GameState.StealingMode = false
+        GameState.GameOver = false
+        GameState.Busy = false
+        ShootDealerBtn.Text = "🔫 ВЫСТРЕЛИТЬ В ДИЛЕРА"
+        ShootSelfBtn.Text = "🔫 ВЫСТРЕЛИТЬ В СЕБЯ"
+        loadShotgun()
+    end
+
+    local function checkEndCondition()
+        if GameState.PlayerHP <= 0 then
+            GameState.GameOver = true
+            DealerFace.Text = "[ 😈 ‿ 😈 ]"
+            setLog("💀 ТЫ ПОГИБ. ДИЛЕР ЗАБРАЛ ВСЁ.", Color3.fromRGB(255, 60, 60), "Нажми любую кнопку выстрела для рестарта.")
+            addSideLog("💀 ТЫ ПОГИБ. Нажми кнопку выстрела для новой игры.", Color3.fromRGB(255, 60, 60))
+            ShootDealerBtn.Text = "🔄 ИГРАТЬ СНОВА"
+            ShootSelfBtn.Text = "🔄 ИГРАТЬ СНОВА"
+            return true
+        elseif GameState.DealerHP <= 0 then
+            GameState.Round += 1
+            DealerFace.Text = "[ ❌ _ ❌ ]"
+            if GameState.Round > 3 then
+                GameState.GameOver = true
+                playSFX(SOUNDS.Win, 1.0)
+                setLog("🏆 ПОБЕДА В DOUBLE OR NOTHING!", Color3.fromRGB(80, 255, 130), "Ты вынес весь банк! Жми кнопку чтобы сыграть еще.")
+                addSideLog("🏆 ПОБЕДА! Ты вынес весь банк.", Color3.fromRGB(80, 255, 130))
+                ShootDealerBtn.Text = "🔄 ИГРАТЬ СНОВА"
+                ShootSelfBtn.Text = "🔄 ИГРАТЬ СНОВА"
+                return true
+            else
+                GameState.MaxHP = math.random(4, 6)
+                GameState.PlayerHP = GameState.MaxHP
+                GameState.DealerHP = GameState.MaxHP
+                GameState.PlayerItems = {}
+                GameState.DealerItems = {}
+                GameState.DealerCuffed = false
+                GameState.PlayerCuffed = false
+                GameState.StealingMode = false
+                setLog("🔥 ДИЛЕР ПОВЕРЖЕН! РАУНД " .. GameState.Round, Color3.fromRGB(100, 255, 150), "Заряжаем новую партию...")
+                task.wait(1.4)
+                loadShotgun()
+                GameState.Turn = "Player"
+                return true
+            end
+        end
+
+        if #GameState.Shells == 0 then
+            task.wait(0.8)
+            loadShotgun()
+        end
+        return false
+    end
+
+    local function switchTurn(nextTurn)
+        GameState.Turn = nextTurn
+        if nextTurn == "Dealer" then
+            if GameState.DealerCuffed then
+                GameState.DealerCuffed = false
+                setLog("⛓️ Дилер в наручниках и пропускает ход!", Color3.fromRGB(120, 200, 255), "Снова твой ход.")
+                addSideLog("⛓️ Дилер в наручниках и пропускает ход. Снова твой ход.", Color3.fromRGB(120, 200, 255))
+                GameState.Turn = "Player"
+                return
+            end
+            task.spawn(DealerTurn)
+        else
+            if GameState.PlayerCuffed then
+                GameState.PlayerCuffed = false
+                setLog("⛓️ Ты в наручниках и пропускаешь ход!", Color3.fromRGB(255, 120, 120), "Ход переходит Дилеру...")
+                addSideLog("⛓️ Ты в наручниках и пропускаешь ход. Ходит Дилер.", Color3.fromRGB(255, 120, 120))
+                GameState.Turn = "Dealer"
+                task.spawn(DealerTurn)
+            else
+                setLog("ТВОЙ ХОД", Color3.fromRGB(120, 255, 150), "Используй предметы или нажимай на спуск.")
+            end
+        end
+    end
+-- КОНЕЦ ЧАСТИ 3В (Вся Часть 3 готова!)
+-- НАЧАЛО ЧАСТИ 4А
+    UseItem = function(who, itemName)
+        local isPlayer = (who == "Player")
+        local actorName = isPlayer and "ТЫ" or "ДИЛЕР"
+        local info = ITEMS_DB[itemName]
+        local head = "▶ " .. actorName .. " использовал " .. info.Icon .. " " .. info.Short
+        local function report(resultText, color)
+            addSideLog(head .. "\n" .. resultText, color)
+        end
+        local RED = Color3.fromRGB(255, 90, 90)
+        local BLUE = Color3.fromRGB(110, 190, 255)
+        local GREEN = Color3.fromRGB(120, 255, 150)
+        local GOLD = Color3.fromRGB(255, 220, 80)
+        local GRAY = Color3.fromRGB(190, 190, 190)
+
+        if itemName == "Magnifying Glass" then
+            playSFX(SOUNDS.Rack, 1.3)
+            if isPlayer then
+                local current = GameState.Shells[1]
+                task.wait(0.9) -- пока лупа летит над столом
+                showChamberCloseup(current == true)
+                report("В стволе сейчас: " .. (current and "🔴 БОЕВОЙ" or "🔵 ХОЛОСТОЙ"), current and RED or BLUE)
+            else
+                DealerFace.Text = "[ 🧐 _ 👁️ ]"
+                setLog("🔍 Дилер проверил патронник лупой...", Color3.fromRGB(210, 210, 210))
+                report("Заглянул в ствол. Что он увидел — неизвестно.", GRAY)
+            end
+
+        elseif itemName == "Beer" then
+            playSFX(SOUNDS.Rack, 1.1)
+            local ejected = table.remove(GameState.Shells, 1)
+            spawn3DShell(ejected)
+            setLog("🍺 " .. (isPlayer and "Ты" or "Дилер") .. " выпил пиво: вылетел " .. (ejected and "🔴 БОЕВОЙ!" or "🔵 ХОЛОСТОЙ!"), Color3.fromRGB(255, 200, 100))
+            report("Текущий патрон выброшен: " .. (ejected and "🔴 БОЕВОЙ" or "🔵 ХОЛОСТОЙ"), ejected and RED or BLUE)
+            updateHPUI()
+            if #GameState.Shells == 0 then task.wait(0.8); loadShotgun() end
+
+        elseif itemName == "Handsaw" then
+            playSFX(SOUNDS.Saw, 1.0)
+            GameState.SawActive = true
+            setLog("🪚 3D-СТВОЛ ОТПИЛЕН! Следующий выстрел = 2 УРОНА!", Color3.fromRGB(255, 100, 50))
+            report("Ствол отпилен: следующий выстрел наносит 2 урона (если патрон боевой).", Color3.fromRGB(255, 150, 60))
+            updateHPUI()
+
+        elseif itemName == "Handcuffs" then
+            playSFX(SOUNDS.Rack, 0.8)
+            if isPlayer then
+                GameState.DealerCuffed = true
+                setLog("⛓️ Дилер закован в наручники!", Color3.fromRGB(120, 210, 255))
+                report("Дилер пропустит свой следующий ход.", BLUE)
+            else
+                GameState.PlayerCuffed = true
+                setLog("⛓️ Дилер заковал тебя в наручники!", Color3.fromRGB(255, 110, 110))
+                report("Ты пропустишь свой следующий ход.", RED)
+            end
+
+        elseif itemName == "Cigarettes" then
+            playSFX(SOUNDS.Heal, 1.0)
+            local key = isPlayer and "PlayerHP" or "DealerHP"
+            local before = GameState[key]
+            GameState[key] = math.min(GameState.MaxHP, before + 1)
+            if GameState[key] > before then
+                setLog("🚬 " .. (isPlayer and "Ты" or "Дилер") .. " восстановил +1 HP.", Color3.fromRGB(120, 255, 150))
+                report("+1 HP (теперь " .. GameState[key] .. "/" .. GameState.MaxHP .. ")", GREEN)
+            else
+                setLog("🚬 Здоровье уже полное — эффекта нет.", Color3.fromRGB(180, 180, 180))
+                report("Здоровье уже полное — эффекта нет.", GRAY)
+            end
+            updateHPUI()
+
+        elseif itemName == "Inverter" then
+            playSFX(SOUNDS.Blank, 1.5)
+            if #GameState.Shells > 0 then
+                GameState.Shells[1] = not GameState.Shells[1]
+                setLog("🔄 ИНВЕРТОР: Полярность патрона изменена!", Color3.fromRGB(200, 130, 255))
+                report("Текущий патрон стал противоположным. Какой он теперь — неизвестно.", Color3.fromRGB(200, 130, 255))
+            end
+
+        elseif itemName == "Burner Phone" then
+            playSFX(SOUNDS.Blank, 1.8)
+            if isPlayer then
+                if #GameState.Shells > 1 then
+                    local idx = math.random(2, #GameState.Shells)
+                    local isLiveShell = GameState.Shells[idx]
+                    setLog(string.format("📱 ТЕЛЕФОН: «%d-й патрон — %s»", idx, isLiveShell and "🔴 БОЕВОЙ" or "🔵 ХОЛОСТОЙ"), Color3.fromRGB(130, 255, 220))
+                    report(string.format("Патрон №%d в обойме: %s\n(№1 — тот, что сейчас в стволе)", idx, isLiveShell and "🔴 БОЕВОЙ" or "🔵 ХОЛОСТОЙ"), isLiveShell and RED or BLUE)
+                else
+                    setLog("📱 ТЕЛЕФОН: «В стволе остался последний патрон...»", Color3.fromRGB(180, 180, 180))
+                    report("В стволе остался последний патрон — телефон ничего не показал.", GRAY)
+                end
+            else
+                DealerFace.Text = "[ 😏 _ 👁️ ]"
+                setLog("📱 Дилер прослушал одноразовый телефон...", Color3.fromRGB(200, 200, 200))
+                report("Что-то узнал про один из патронов. Что именно — неизвестно.", GRAY)
+            end
+
+        elseif itemName == "Expired Medicine" then
+            local key = isPlayer and "PlayerHP" or "DealerHP"
+            local before = GameState[key]
+            if math.random(1, 2) == 1 then
+                playSFX(SOUNDS.Heal, 1.1)
+                GameState[key] = math.min(GameState.MaxHP, before + 2)
+                setLog("💊 ТАБЛЕТКИ: Повезло! +" .. (GameState[key] - before) .. " HP!", Color3.fromRGB(100, 255, 140))
+                report("Повезло! +" .. (GameState[key] - before) .. " HP (теперь " .. GameState[key] .. "/" .. GameState.MaxHP .. ")", GREEN)
+            else
+                playSFX(SOUNDS.Blank, 0.6)
+                GameState[key] = before - 1
+                setLog("💊 ТАБЛЕТКИ: Отравление! -1 HP!", Color3.fromRGB(255, 70, 70))
+                report("Отравление! -1 HP (теперь " .. math.max(0, GameState[key]) .. "/" .. GameState.MaxHP .. ")", RED)
+            end
+            updateHPUI()
+            checkEndCondition()
+
+        elseif itemName == "Adrenaline" then
+            playSFX(SOUNDS.Heal, 1.4)
+            if isPlayer then
+                GameState.StealingMode = true
+                setLog("💉 АДРЕНАЛИН! Кликни на любой золотой предмет Дилера!", Color3.fromRGB(255, 220, 60))
+                report("Выбери предмет Дилера (подсвечены золотым): он украдётся и сразу применится.", GOLD)
+            else
+                local candidates = {}
+                for idx, n in ipairs(GameState.PlayerItems) do
+                    if n ~= "Adrenaline" and canUseItem("Dealer", n) then table.insert(candidates, idx) end
+                end
+                if #candidates > 0 then
+                    local pick = candidates[math.random(1, #candidates)]
+                    local stolen = table.remove(GameState.PlayerItems, pick)
+                    local sInfo = ITEMS_DB[stolen]
+                    setLog("💉 Дилер украл твой предмет: " .. sInfo.Short .. "!", Color3.fromRGB(255, 100, 100))
+                    report("Украл у тебя " .. sInfo.Icon .. " " .. sInfo.Short .. " и применяет его сразу.", RED)
+                    renderInventories()
+                    task.wait(0.8)
+                    UseItem("Dealer", stolen)
+                else
+                    report("Красть было нечего.", GRAY)
+                end
+            end
+        end
+        renderInventories()
+    end
+-- КОНЕЦ ЧАСТИ 4А
+-- НАЧАЛО ЧАСТИ 4Б
+    local function fireShot(shooter, target)
+        if #GameState.Shells == 0 or GameState.Busy then return end
+        GameState.Busy = true
+
+        local isLive = table.remove(GameState.Shells, 1)
+        local dmg = GameState.SawActive and 2 or 1
+        GameState.SawActive = false
+
+        local whoName = (shooter == "Player") and "ТЫ" or "ДИЛЕР"
+        local atName
+        if shooter == target then atName = "в себя"
+        elseif target == "Dealer" then atName = "в Дилера"
+        else atName = "в тебя" end
+
+        animate3DGun(target, isLive, dmg > 1)
+        spawn3DShell(isLive)
+        if isLive and target == "Player" then blackoutEnd() end
+
+        if isLive then
+            addSideLog("🔫 " .. whoName .. " выстрелил " .. atName .. ": 🔴 БОЕВОЙ (-" .. dmg .. " HP)", Color3.fromRGB(255, 90, 90))
+            if target == "Dealer" then
+                GameState.DealerHP -= dmg
+                DealerFace.Text = "[ 😵 _ 😵 ]"
+                setLog("💥 БАХ! БОЕВОЙ! Дилер получил -" .. dmg .. " HP!", Color3.fromRGB(255, 70, 70))
+            else
+                GameState.PlayerHP -= dmg
+                DealerFace.Text = "[ 😈 ‿ 😈 ]"
+                setLog("💥 БАХ! БОЕВОЙ! Ты получил -" .. dmg .. " HP!", Color3.fromRGB(255, 50, 50))
+            end
+            updateHPUI()
+            GameState.Busy = false
+            if checkEndCondition() then return end
+            switchTurn(shooter == "Player" and "Dealer" or "Player")
+        else
+            addSideLog("🔫 " .. whoName .. " выстрелил " .. atName .. ": 🔵 ХОЛОСТОЙ", Color3.fromRGB(110, 190, 255))
+            setLog("💨 *ЩЕЛК* — ХОЛОСТОЙ ПАТРОН!", Color3.fromRGB(110, 190, 255))
+            updateHPUI()
+            GameState.Busy = false
+            if checkEndCondition() then return end
+            if shooter == target then
+                if shooter == "Player" then
+                    setLog("💨 ХОЛОСТОЙ В СЕБЯ! Ты сохраняешь ход.", Color3.fromRGB(110, 255, 170))
+                else
+                    task.wait(0.6)
+                    task.spawn(DealerTurn)
+                end
+            else
+                switchTurn(shooter == "Player" and "Dealer" or "Player")
+            end
+        end
+    end
+
+    DealerTurn = function()
+        if GameState.GameOver or GameState.Turn ~= "Dealer" then return end
+        DealerFace.Text = "[ 👁️ _ 👁️ ]"
+        setLog("🤖 Дилер оценивает шансы...", Color3.fromRGB(255, 180, 180))
+        task.wait(0.9)
+
+        local knownShell = nil
+        local i = 1
+        while i <= #GameState.DealerItems do
+            if GameState.GameOver or GameState.Turn ~= "Dealer" or #GameState.Shells == 0 then break end
+            local item = GameState.DealerItems[i]
+            local used = false
+
+            if item == "Cigarettes" and GameState.DealerHP < GameState.MaxHP then
+                table.remove(GameState.DealerItems, i); UseItem("Dealer", item); used = true
+            elseif item == "Magnifying Glass" and knownShell == nil then
+                table.remove(GameState.DealerItems, i); local _, first = next(GameState.Shells); knownShell = first; UseItem("Dealer", item); used = true
+            elseif item == "Inverter" and knownShell == false then
+                table.remove(GameState.DealerItems, i); knownShell = true; UseItem("Dealer", item); used = true
+            elseif item == "Handcuffs" and not GameState.PlayerCuffed and #GameState.Shells > 1 then
+                table.remove(GameState.DealerItems, i); UseItem("Dealer", item); used = true
+            elseif item == "Handsaw" and not GameState.SawActive and knownShell == true then
+                table.remove(GameState.DealerItems, i); UseItem("Dealer", item); used = true
+            elseif item == "Beer" and knownShell == nil and #GameState.Shells > 1 then
+                table.remove(GameState.DealerItems, i); UseItem("Dealer", item); used = true
+            elseif item == "Burner Phone" and knownShell == nil and #GameState.Shells > 1 then
+                table.remove(GameState.DealerItems, i); UseItem("Dealer", item); used = true
+            elseif item == "Expired Medicine" and GameState.DealerHP == 2 and GameState.DealerHP < GameState.MaxHP then
+                table.remove(GameState.DealerItems, i); UseItem("Dealer", item); used = true
+            elseif item == "Adrenaline" and canUseItem("Dealer", "Adrenaline") then
+                table.remove(GameState.DealerItems, i); UseItem("Dealer", item); used = true
+            end
+
+            if used then renderInventories(); task.wait(0.9) else i += 1 end
+        end
+
+        if GameState.GameOver or GameState.Turn ~= "Dealer" or #GameState.Shells == 0 then return end
+
+        local liveCount, blankCount = 0, 0
+        for _, s in ipairs(GameState.Shells) do if s then liveCount += 1 else blankCount += 1 end end
+
+        local shootPlayer = (knownShell ~= nil) and knownShell or (liveCount >= blankCount)
+        if shootPlayer then
+            setLog("🤖 Дилер наводит 3D-дробовик на ТЕБЯ...", Color3.fromRGB(255, 100, 100))
+            fireShot("Dealer", "Player")
+        else
+            setLog("🤖 Дилер приставляет дуло к СЕБЕ...", Color3.fromRGB(150, 200, 255))
+            fireShot("Dealer", "Dealer")
+        end
+    end
+
+    ShootDealerBtn.MouseButton1Click:Connect(function()
+        if GameState.GameOver then startNewGame() return end
+        if GameState.Turn == "Player" and not GameState.StealingMode and not GameState.Busy then
+            fireShot("Player", "Dealer")
+        end
+    end)
+
+    ShootSelfBtn.MouseButton1Click:Connect(function()
+        if GameState.GameOver then startNewGame() return end
+        if GameState.Turn == "Player" and not GameState.StealingMode and not GameState.Busy then
+            fireShot("Player", "Player")
+        end
+    end)
+
+    startNewGame()
+end
+
+TriggerBtn.MouseButton1Click:Connect(Launch3DBuckshot)
+-- КОНЕЦ ЧАСТИ 4Б (Финал!)
